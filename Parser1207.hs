@@ -45,7 +45,6 @@ data Expression
     | LocDefsX  Expression Expression
     | LocDefX   Expression Expression
     -- | X         Expression Expression Expression
-    -- wie funktioniert das lol
     deriving Show
 
 type Parser a = [Token] -> Maybe (a, [Token])
@@ -68,9 +67,6 @@ restProgram xs1 = do
             return (e:es, xs3)
         _ -> Nothing
 
--- Def             ::= Variable Restdef
--- RestDef         ::= "=" Expr | Variable Restdef
-
 def :: Parser Expression
 def xs1 = do
     (e, xs2)  <- variable xs1
@@ -83,10 +79,6 @@ restDef (Equals : xs1) = do
     (e, xs2)  <- expr xs1 -- hier Liste übergeben ohne expr
     return ([e], xs2)
 restDef _ = Nothing
-
-    
--- restDef2 :: Parser Expression
--- restDef2 
 
 locDefs :: Parser Expression
 locDefs xs1 = do
@@ -244,6 +236,8 @@ restMultExpr (Times : xs1) = do
     (e, xs2)  <- atomicExpr xs1
     (es, xs3) <- restMultExpr xs2
     return (e:es, xs3)
+restMultExpr xs = return ([], xs)
+
 
 atomicExpr :: Parser Expression
 -- atomicExpr (Variable : xs) ??? wie!
@@ -254,8 +248,8 @@ atomicExpr (OpenPar : xs1)  = do
     case xs2 of
         ClosePar : xs3 -> return (e, xs3)
         _ -> Nothing
-atomicExpr _ = Nothing
+atomicExpr xs = Nothing xs
 
 variable :: Parser Expression
 variable (Name i : xs) = return (Word i, xs)
-variable xs            = Nothing
+variable _             = Nothing
