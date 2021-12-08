@@ -205,7 +205,7 @@ compareExpr xs1 = do
     case xs2 of
         LessThan : xs3 -> do
             (es, xs4) <- negExpr xs3
-            return (LessThanX e es, xs3)
+            return (LessThanX e es, xs4)
         -- Equals : xs3   -> do
         --     (es, xs4) <- negExpr xs3
         --     return (IsX e es, xs3)
