@@ -211,7 +211,7 @@ compareExpr xs1 = do
         --     return (IsX e es, xs3)
         _              -> do
             (es, xs3) <- restCompareExpr xs2
-            return (foldl CompareX e es, xs3)
+            return (foldl IsX e es, xs3)
             -- return ([], xs2) -- wie umgeht diesen epsilon Fall?
 
     -- (es, xs3) <- restCompareExpr xs2
