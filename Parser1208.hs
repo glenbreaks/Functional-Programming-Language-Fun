@@ -30,7 +30,6 @@ data Expression
     | AndX      Expression Expression
     | NotX      Expression
     | NeutralX  Expression
-    | CompareX  Expression Expression
     | LessThanX Expression Expression
     | IsX       Expression Expression
     | NegX      Expression
@@ -41,7 +40,7 @@ data Expression
     | LetX      Expression Expression
     | IfX       Expression Expression Expression
     | Programs  Expression Expression
-    | DefX      Expression Expression
+    | Def       Expression Expression
     | LocDefs   Expression Expression
     | LocDef    Expression Expression
     deriving Show
@@ -64,13 +63,13 @@ restProgram (Name i : xs1) = do
             (es, xs3) <- restProgram xs2
             return (Word i:es, xs3)
         _               -> Nothing
-restProgram xs = return ([], xs)
+restProgram xs             = return ([], xs)
 
 def :: Parser Expression
 def xs1 = do
     (e, xs2)  <- variable xs1
     (es, xs3) <- restDef xs2
-    return (foldl DefX e es, xs3) -- fold?
+    return (foldl Def e es, xs3) -- fold?
 
 restDef :: Parser [Expression]
 restDef (Name i : xs1) = do
