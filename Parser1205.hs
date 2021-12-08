@@ -4,7 +4,7 @@ data Token
     | Boolean Bool
     | Or
     | And
---     | Not    -- das selbe Token wie Minus und Neg?
+    | Not
     | LessThan
     | Is
     | Minus
@@ -28,7 +28,7 @@ data Expression
     | Word      String
     | OrX       Expression Expression   -- Expressions spezifizieren?
     | AndX      Expression Expression
-    | NotX      Expression              -- [Token] Expression
+    | NotX      Expression
     | CompareX  Expression Expression
     | LessThanX Expression Expression
     | IsX       Expression Expression
@@ -43,8 +43,6 @@ data Expression
     | DefX      Expression Expression
     | LocDefs   Expression Expression
     | LocDef    Expression Expression
---     | X         Expression Expression Expression -- eig nicht mehr nötig wg IfX 
-                                                    -- und LetX
     deriving Show
 
 type Parser a = [Token] -> Maybe (a, [Token])
@@ -81,7 +79,7 @@ restDef (Name i : xs1) = do
     (es, xs2) <- restDef xs1
     return (Word i:es, xs2)
 restDef (Equals : xs1) = do
-    (e, xs2)  <- expr xs1 -- hier Liste übergeben!
+    (e, xs2)  <- expr xs1   -- hier Liste übergeben!
     return ([e], xs2)       -- wenn [e] hier erlaubt ist, dann war die Aufteilung 
                             -- in zwei Codezeilen mit e:es überall sonst unnötig?? 
                             -- Welche Art von Expr soll denn übergeben werden?
@@ -151,7 +149,9 @@ orExpr xs1 = do
 
 restOrExpr :: Parser [Expression]
 restOrExpr (Or : xs1) = do
-    (e, xs2)  <- andExpr xs1
+    -- (e, xs2) <- orExpr xs1
+    -- return ([e], xs2)
+    (e, xs2)  <- andExpr xs1    -- Or ausgeschrieben
     (es, xs3) <- restOrExpr xs2
     return (e:es, xs3)
 restOrExpr xs         = return ([], xs)
@@ -174,7 +174,7 @@ notExpr :: Parser Expression
 --     (e, xs2)  <- restNotExpr xs1
 --     (es, xs3) <- compareExpr xs2
 --     return (foldl NotX e es, xs3)
-notExpr (Minus : xs1) = do
+notExpr (Not : xs1) = do
     (e, xs2)  <- compareExpr xs1
     return (NotX e, xs2)
 notExpr xs1         = do        -- compareExpr ausgeschrieben
@@ -185,23 +185,18 @@ notExpr xs1         = do        -- compareExpr ausgeschrieben
         LessThan : xs3 -> do
             (es, xs4) <- negExpr xs3
             return (LessThanX e es, xs3)
-        Equals : xs3   -> do
-            (es, xs4) <- negExpr xs3
-            return (IsX e es, xs3)
         _              -> do
             (es, xs3) <- restCompareExpr xs2
-            return (foldl CompareX e es, xs3) -- wie umgeht man diesen epsilon Fall?
-
+            return (foldl IsX e es, xs3)
     -- return (foldl CompareX e es, xs3) -- hier muss man schon wissen, ob < oder ==!
 
 -- restNotExpr :: Parser [Token]
--- restNotExpr (Minus : xs) = return ([Minus], xs)
+-- restNotExpr (Not : xs) = return ([Not], xs)
 -- restNotExpr xs           = return ([], xs)
 
 compareExpr :: Parser Expression --hier dieselben cases wie bei -,+ und /,*
 compareExpr xs1 = do
     (e, xs2)  <- negExpr xs1
-
     case xs2 of
         LessThan : xs3 -> do
             (es, xs4) <- negExpr xs3
@@ -263,8 +258,8 @@ addExpr xs1 = do
     -- (es, xs3) <- restAddExpr xs2 -- weg*
     case xs2 of 
         Minus : xs3 -> do
-            (es, xs4) <- multExpr xs3
-            return (Diff e es, xs3)
+            (es, xs4) <- multExpr xs3 -- restMult??
+            return (Diff e es, xs4)
         _ : xs3     -> do
             (es, xs3) <- restAddExpr xs2
             return (foldl Sum e es, xs3)
@@ -274,7 +269,9 @@ restAddExpr :: Parser [Expression] -- wird jetzt nur noch aufgrufen falls Plus k
 -- restAddExpr (Minus : xs1) = do
 --     (e, xs2)  <- atomicExpr xs1
 --     (es, xs3) <- restMultExpr xs2
---     return (e:es, xs3)
+    -- (e, xs2) <- multExpr xs1
+    -- xs <- [OpenPar, Minus, e, ClosePar]
+    -- return ([e], xs)
 restAddExpr (Plus : xs1)  = do
     (e, xs2)  <- multExpr xs1
     (es, xs3) <- restAddExpr xs2
@@ -288,7 +285,7 @@ multExpr xs1 = do
     case xs2 of 
         Div : xs3 -> do
             (es, xs4) <- atomicExpr xs3
-            return (DivX e es, xs3)
+            return (DivX e es, xs4)
         _ : xs3   -> do
             (es, xs3) <- restMultExpr xs2
             return (foldl Mult e es, xs3)
