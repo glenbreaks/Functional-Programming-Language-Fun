@@ -245,24 +245,6 @@ negExpr (Minus : xs1) = do
     return (Neg e, xs2)
 negExpr xs            = atomicExpr xs
 
--- moreAtomicExpr :: Parser [AtomicExpression]
--- moreAtomicExpr xs1 = do
---     (e, xs2)  <- atomicExpr xs1
---     (es, xs3) <- restAtomicExpr xs2
---     return (e:es, xs3)
-
--- atomicExpr :: Parser AtomicExpression
--- atomicExpr (Number i : xs)  = return (Val i, xs)
--- atomicExpr (Boolean i : xs) = return (BoolVal i, xs)
--- atomicExpr (OpenPar : xs1)  = do
---     (e, xs2) <- expr xs1
---     case xs2 of
---         ClosePar : xs3 -> return (ParX e, xs3)
---         _              -> Nothing
--- -- atomicExpr xs = variable xs
--- atomicExpr (Name i : xs)    = return (Variable i, xs)
--- atomicExpr _                = Nothing
-
 atomicExpr :: Parser Expression
 atomicExpr (Number i : xs1)  = do
     (is, xs2) <- restAtomicExpr xs1
