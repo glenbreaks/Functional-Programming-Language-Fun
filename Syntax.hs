@@ -16,7 +16,6 @@ NotExpr         ::= "not" CompareExpr | CompareExpr
 CompareExpr     ::= AddExpr RestCompareExpr
 RestCompareExpr ::= e | ("<" | "==") AddExpr
 AddExpr         ::= MultExpr ("-" MultExpr2 | "+" RestAddExpr | e)
--- AddExpr         ::= MultExpr RestAddExpr
 RestAddExpr     ::= e | MultExpr2 RestAddExpr
 MultExpr        ::= NegExpr ("/" MultExpr2 | "*" RestMultExpr | e)
 MultExpr2       ::= AtomicExpr ("/" MultExpr2 | "*" RestMultExpr | e)
