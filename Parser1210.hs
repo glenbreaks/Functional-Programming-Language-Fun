@@ -191,47 +191,59 @@ compareExpr xs1 = do
 
 addExpr :: Parser Expression
 addExpr xs1 = do
-    (e, xs2)  <- negExpr xs1
+    (e, xs2)  <- multExpr xs1 -- Präzedenzänderung: Add, Mult, Neg
     case xs2 of 
         Minus : xs3 -> do
-            (es, xs4) <- multExpr xs3
+            (es, xs4) <- multExpr2 xs3 -- damit 5--2 nicht geht
             return (Diff e es, xs4)
-        Plus : _    -> do
+        Plus :  _   -> do
             (es, xs3) <- restAddExpr xs2
             return (foldl Sum e es, xs3)
-        _           -> negExpr xs1
+        _           -> multExpr xs1
 
 restAddExpr :: Parser [Expression] -- wird jetzt nur noch aufgrufen falls Plus kommt
 restAddExpr (Plus : xs1)  = do
-    (e, xs2)  <- multExpr xs1
+    (e, xs2)  <- multExpr2 xs1 -- damit 5+-2 nicht geht
     (es, xs3) <- restAddExpr xs2
     return (e:es, xs3)
 restAddExpr xs            = return ([], xs)
 
-negExpr :: Parser Expression
-negExpr (Minus : xs1) = do
-    (e, xs2)  <- multExpr xs1
-    return (Neg e, xs2)
-negExpr xs            = multExpr xs
-
 multExpr :: Parser Expression
 multExpr xs1 = do
-    (e, xs2)  <- atomicExpr xs1
+    (e, xs2)  <- negExpr xs1
     case xs2 of 
         DivBy : xs3 -> do
-            (es, xs4) <- atomicExpr xs3
+            (es, xs4) <- multExpr2 xs3 -- damit 5/-2 nicht geht
             return (Div e es, xs4)
-        Times : _  -> do
+        Times : _   -> do
             (es, xs3) <- restMultExpr xs2
             return (foldl Mult e es, xs3)
-        _          -> atomicExpr xs1
+        _           -> negExpr xs1
+
+multExpr2 :: Parser Expression -- falls keine Negation möglich sein soll, zB (5-3) ist doof
+multExpr2 xs1 = do
+    (e, xs2) <- atomicExpr xs1
+    case xs2 of 
+        DivBy : xs3 -> do
+            (es, xs4) <- multExpr xs3
+            return (Div e es, xs4)
+        Times : _   -> do
+            (es, xs3) <- restMultExpr xs2
+            return (foldl Mult e es, xs3)
+        _           -> atomicExpr xs1
 
 restMultExpr :: Parser [Expression]
 restMultExpr (Times : xs1) = do
-    (e, xs2)  <- atomicExpr xs1
+    (e, xs2)  <- multExpr2 xs1 -- damit 5-2 nicht geht
     (es, xs3) <- restMultExpr xs2
     return (e:es, xs3)
 restMultExpr xs            = return ([], xs)
+
+negExpr :: Parser Expression
+negExpr (Minus : xs1) = do
+    (e, xs2)  <- atomicExpr xs1
+    return (Neg e, xs2)
+negExpr xs            = atomicExpr xs
 
 -- moreAtomicExpr :: Parser [AtomicExpression]
 -- moreAtomicExpr xs1 = do
@@ -307,3 +319,13 @@ ex11 = expr [Let, Name "x", Equals, Number 2, In, Number 2, Times, Name "x"] -- 
 ex12 = program [Name "f",  Name "x", Equals, Number 2, Number 3, Times, Name "x", Semicolon]
 main :: IO()
 main = print ex9
+
+ex13 = expr [Name "f", OpenPar, Name "a", LessThan, Name "b", ClosePar] -- passt
+ex14 = expr [Number 1, Times, Number 2, Times, Number 3] -- passt
+ex15 = program [Name "a", Name "b", Name "c", Equals, Number 1, Times, Number 2, DivBy, Number 4, Semicolon] -- passt
+ex16 = expr [Minus, Number 2, Times, Number 3] -- passt
+ex17 = expr [Minus, Number 2, Minus, OpenPar, Minus, Number 5, ClosePar] -- passt
+ex18 = expr [Minus, Number 2, Plus, OpenPar, Minus, Number 5, ClosePar] -- passen alle
+ex19 = expr [Minus, Number 2, Minus, OpenPar, Minus, Number 5, ClosePar]
+ex20 = expr [Minus, Number 3, Times, OpenPar, Minus, Number 4, ClosePar]
+ex21 = expr [Minus, Number 2, DivBy, OpenPar, Minus, Number 5, ClosePar]
