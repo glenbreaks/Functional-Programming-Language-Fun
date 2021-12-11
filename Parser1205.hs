@@ -24,8 +24,8 @@ data Token
 
 data Expression
     = Val       Integer
-    | ValBool   Bool
     | Word      String
+    | ValBool   Bool
     | OrX       Expression Expression   -- Expressions spezifizieren?
     | AndX      Expression Expression
     | NotX      Expression
