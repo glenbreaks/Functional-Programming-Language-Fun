@@ -220,7 +220,7 @@ multExpr xs1 = do
             return (foldl Mult e es, xs3)
         _           -> negExpr xs1
 
-multExpr2 :: Parser Expression -- falls keine Negation möglich sein soll, zB (5-3) ist doof
+multExpr2 :: Parser Expression -- falls keine Negation möglich sein soll, zB (5--3) ist doof
 multExpr2 xs1 = do
     (e, xs2) <- atomicExpr xs1
     case xs2 of 
@@ -234,7 +234,7 @@ multExpr2 xs1 = do
 
 restMultExpr :: Parser [Expression]
 restMultExpr (Times : xs1) = do
-    (e, xs2)  <- multExpr2 xs1 -- damit 5-2 nicht geht
+    (e, xs2)  <- multExpr2 xs1 -- damit 5--2 nicht geht
     (es, xs3) <- restMultExpr xs2
     return (e:es, xs3)
 restMultExpr xs            = return ([], xs)
