@@ -47,7 +47,7 @@ data Expression
     | Val       Integer
     | BoolVal   Bool
     | Variable  String
-    | Atomics   Expression Expression
+    | Function  Expression Expression
     deriving Show
 
 -- AtomicExprssions gehören jetzt auch zu Expression, da wir sie doch nicht als
@@ -241,20 +241,20 @@ negExpr xs            = atomicExpr xs
 atomicExpr :: Parser Expression
 atomicExpr (Number i : xs1)  = do
     (is, xs2) <- restAtomicExpr xs1
-    return (foldl Atomics (Val i) is, xs2)
+    return (foldl Function (Val i) is, xs2)
 atomicExpr (Boolean i : xs1) = do
     (is, xs2) <- restAtomicExpr xs1
-    return (foldl Atomics (BoolVal i) is, xs2)
+    return (foldl Function (BoolVal i) is, xs2)
 atomicExpr (OpenPar : xs1)   = do
     (e, xs2)  <- expr xs1
     case xs2 of
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
-            return (foldl Atomics e es, xs4)
+            return (foldl Function e es, xs4)
         _              -> Nothing
 atomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
-    return (foldl Atomics (Variable i) is, xs2)
+    return (foldl Function (Variable i) is, xs2)
 atomicExpr _                 = Nothing
 
 restAtomicExpr :: Parser [Expression]
