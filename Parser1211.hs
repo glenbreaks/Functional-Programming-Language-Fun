@@ -25,11 +25,11 @@ data Token
 
 newtype Program = Program [Definition] deriving Show
 
-data Definition = Definition [AtomicExpression] Expression deriving Show
+data Definition = Definition [Expression] Expression deriving Show
 
 newtype LocDefs = LocDefs [LocDef] deriving Show
 
-data LocDef     = LocDef AtomicExpression Expression deriving Show
+data LocDef     = LocDef Expression Expression deriving Show
 
 data Expression
     = LetX      LocDefs Expression
@@ -44,17 +44,14 @@ data Expression
     | Sum       Expression Expression
     | Div       Expression Expression
     | Mult      Expression Expression
-    | A         [AtomicExpression]
+    | Val       Integer
+    | BoolVal   Bool
+    | Variable  String
+    | Atomics   Expression Expression
     deriving Show
 
-data AtomicExpression
-    = Val      Integer
-    | BoolVal  Bool
-    | Variable String
-    | NewX     Expression
-    deriving Show
-
---
+-- AtomicExprssions gehören jetzt auch zu Expression, da wir sie doch nicht als
+-- Liste zurückgeben müssen.
 
 type Parser a = [Token] -> Maybe (a, [Token])
 
@@ -86,7 +83,7 @@ def xs1 = do
     (f, xs4)  <- expr xs3
     return (Definition (e:es) f, xs4)
 
-restDef :: Parser [AtomicExpression]
+restDef :: Parser [Expression]
 restDef (Name i : xs1) = do
     (is, xs2) <- restDef xs1
     return (Variable i:is, xs2)
@@ -136,40 +133,23 @@ expr (If : xs1)  = do
         _          -> Nothing
 expr xs          = orExpr xs
 
--- bei rechtesassoziativen Funktionen foldr Expression (letztes Element der Liste) (init Liste)?
-
--- a & b & c => a & (b&c) aber bei uns: b & (a&c)
-
--- e : es
--- = e:init es : last es
-
 orExpr :: Parser Expression
 orExpr xs1 = do
     (e, xs2)  <- andExpr xs1
-    (es, xs3) <- restOrExpr xs2
-    return (foldr OrX e es, xs3)
-    -- return (foldr OrX (last es) (e:init es), xs3)
-
-restOrExpr :: Parser [Expression]
-restOrExpr (Or : xs1) = do
-    (e, xs2)  <- andExpr xs1
-    (es, xs3) <- restOrExpr xs2
-    return (e:es, xs3)
-restOrExpr xs         = return ([], xs)
+    case xs2 of
+        Or : xs3 -> do
+            (es, xs4) <- orExpr xs3
+            return (OrX e es, xs4)
+        _        -> return (e, xs2)
 
 andExpr :: Parser Expression
 andExpr xs1 = do
     (e, xs2)  <- notExpr xs1
-    (es, xs3) <- restAndExpr xs2
-    return (foldr AndX e es, xs3)
-    -- return (foldr AndX (last es) (e:init es), xs3)
-
-restAndExpr :: Parser [Expression]
-restAndExpr (And : xs1) = do
-    (e, xs2)  <- notExpr xs1
-    (es, xs3) <- restAndExpr xs2
-    return (e:es, xs3)
-restAndExpr xs          = return ([], xs)
+    case xs2 of
+        And : xs3 -> do
+            (es, xs4) <- andExpr xs3
+            return (AndX e es, xs4)
+        _         -> return (e, xs2)
 
 notExpr :: Parser Expression
 notExpr (Not : xs1) = do
@@ -183,29 +163,29 @@ compareExpr xs1 = do
     case xs2 of
         LessThan : xs3 -> do
             (es, xs4) <- addExpr xs3
-            -- Bei Eingabe von a<b<c wird ein Just(..., [LessThan, c]) rerturnt, kein Nothing!
-            -- Durch diese Cases wird stattdessen Nothing returnt
-            -- case xs4 of
-            --     LessThan : xs5 -> Nothing
-            --     Is : xs5       -> Nothing
-            --     _              -> return (LessThanX e es, xs4)
-            return (LessThanX e es, xs4)
+            -- Durch diese Cases wird bei A < B < C Nothing returnt
+            case xs4 of
+                LessThan : _ -> Nothing
+                Is : _       -> Nothing
+                _            -> return (LessThanX e es, xs4)
         Is : xs3       -> do
             (es, xs4) <- addExpr xs3
-            -- case xs4 of
-            --     LessThan : xs5 -> Nothing
-            --     Is : xs5       -> Nothing
-            --     _              -> 
-            return (IsX e es, xs4)
+            case xs4 of
+                LessThan : _ -> Nothing
+                Is : _       -> Nothing
+                _            -> return (IsX e es, xs4)
         _              -> addExpr xs1
 
 addExpr :: Parser Expression
 addExpr xs1 = do
-    (e, xs2)  <- multExpr xs1 -- Präzedenzänderung: Add, Mult, Neg
+    (e, xs2)  <- multExpr xs1
     case xs2 of 
         Minus : xs3 -> do
             (es, xs4) <- multExpr2 xs3 -- damit 5--2 nicht geht
-            return (Diff e es, xs4)
+            -- Durch diese Cases wird bei A - B - C Nothing returnt
+            case xs4 of
+                Minus : _ -> Nothing
+                _         -> return (Diff e es, xs4)
         Plus :  _   -> do
             (es, xs3) <- restAddExpr xs2
             return (foldl Sum e es, xs3)
@@ -223,8 +203,11 @@ multExpr xs1 = do
     (e, xs2)  <- negExpr xs1
     case xs2 of 
         DivBy : xs3 -> do
-            (es, xs4) <- multExpr2 xs3 -- damit 5/-2 nicht geht
-            return (Div e es, xs4)
+            (es, xs4) <- atomicExpr xs3 -- negExpr übersprungen, damit 5/-2 nicht geht
+            -- Durch diese Cases wird bei A / B / C Nothing returnt
+            case xs4 of
+                DivBy : _ -> Nothing
+                _         -> return (Div e es, xs4)
         Times : _   -> do
             (es, xs3) <- restMultExpr xs2
             return (foldl Mult e es, xs3)
@@ -232,10 +215,10 @@ multExpr xs1 = do
 
 multExpr2 :: Parser Expression -- falls keine Negation möglich sein soll, zB (5--3) ist doof
 multExpr2 xs1 = do
-    (e, xs2) <- atomicExpr xs1
+    (e, xs2)  <- atomicExpr xs1
     case xs2 of 
         DivBy : xs3 -> do
-            (es, xs4) <- multExpr xs3
+            (es, xs4) <- atomicExpr xs3
             return (Div e es, xs4)
         Times : _   -> do
             (es, xs3) <- restMultExpr xs2
@@ -258,23 +241,23 @@ negExpr xs            = atomicExpr xs
 atomicExpr :: Parser Expression
 atomicExpr (Number i : xs1)  = do
     (is, xs2) <- restAtomicExpr xs1
-    return (A (Val i:is), xs2)
+    return (foldl Atomics (Val i) is, xs2)
 atomicExpr (Boolean i : xs1) = do
     (is, xs2) <- restAtomicExpr xs1
-    return (A (BoolVal i:is), xs2)
+    return (foldl Atomics (BoolVal i) is, xs2)
 atomicExpr (OpenPar : xs1)   = do
     (e, xs2)  <- expr xs1
     case xs2 of
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
-            return (A (NewX e:es), xs4)
+            return (foldl Atomics e es, xs4)
         _              -> Nothing
 atomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
-    return (A (Variable i:is), xs2)
+    return (foldl Atomics (Variable i) is, xs2)
 atomicExpr _                 = Nothing
 
-restAtomicExpr :: Parser [AtomicExpression]
+restAtomicExpr :: Parser [Expression]
 restAtomicExpr (Number i : xs1)  = do
     (is, xs2) <- restAtomicExpr xs1
     return (Val i:is, xs2)
@@ -286,14 +269,14 @@ restAtomicExpr (OpenPar : xs1)   = do
     case xs2 of
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
-            return (NewX e:es, xs4)
+            return (e:es, xs4)
         _              -> Nothing
 restAtomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (Variable i:is, xs2)
 restAtomicExpr xs                = return ([], xs)
 
-variable :: Parser AtomicExpression
+variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
 variable _             = Nothing
 
@@ -326,7 +309,7 @@ ex23 = compareExpr [Minus, Number 2, LessThan, Minus, Number 1] -- passt
 ex24 = addExpr [Number 2, Plus, Number 3, Plus, Number 4] -- passt
 ex25 = multExpr [Number 2, Times, Number 3, Times, Number 4] -- passt
 ex26 = expr [Not, Boolean True, Is, Boolean False] -- passt
-ex27 = compareExpr [Boolean True, Equals, Boolean False] -- passt
+ex27 = def [Boolean True, Equals, Boolean False] -- diesen Fehler mit Nothing abfangen wie bei compare???
 ex28 = expr [Boolean True, And, Boolean False] -- passt
 ex29 = expr [Number 1, And, Number 2] -- passt
 ex30 = expr [Boolean True, And, Boolean False, And, Name "d"] -- passt
@@ -339,3 +322,4 @@ ex36 = program [Name "a", Name "b", Equals, Name "a", Or, Name "b", Plus, Number
 ex37 = program [Name "a", Name "b", Equals, Name "a", Or, Name "b", Plus, Number 3, Semicolon, Name "a", Name "b", Equals, Name "a", Or, Name "b", Plus, Number 3, Semicolon] -- passt
 ex38 = program [Name "a", Name "b", Equals, Name "a", Or, Name "b", Plus, Number 3, Semicolon, Name "x", Equals, Number 3, Semicolon] -- passt
 ex39 = program [Name "a", Equals, Boolean True, Semicolon, Name "y", Equals, Boolean False, Semicolon] -- passt
+ex40 = expr [Number 1, Or, Number 2, Or, Number 3, And, Number 4, And, Number 5]
