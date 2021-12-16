@@ -43,28 +43,33 @@ wordyfier xs = words $ spaceyfier xs
 example2 = wordyfier "f x == 3<4;"
 
 tokenizer :: [String] -> [Token]
-tokenizer x = do
-    case x of
-        "|"     : xs -> Or            : tokenizer xs
-        "&"     : xs -> And           : tokenizer xs
-        "not"   : xs -> Not           : tokenizer xs
-        "<"     : xs -> LessThan      : tokenizer xs
-        "=="    : xs -> Is            : tokenizer xs
-        "-"     : xs -> Minus         : tokenizer xs
-        "+"     : xs -> Plus          : tokenizer xs
-        "/"     : xs -> Div           : tokenizer xs
-        "*"     : xs -> Times         : tokenizer xs
-        "("     : xs -> OpenPar       : tokenizer xs
-        ")"     : xs -> ClosePar      : tokenizer xs
-        "Let"   : xs -> Let           : tokenizer xs
-        "In"    : xs -> In            : tokenizer xs
-        "If"    : xs -> If            : tokenizer xs
-        "Then"  : xs -> Then          : tokenizer xs
-        "Else"  : xs -> Else          : tokenizer xs
-        ";"     : xs -> Semicolon     : tokenizer xs
-        "="     : xs -> Equals        : tokenizer xs
-        "True"  : xs -> Boolean True  : tokenizer xs
-        "False" : xs -> Boolean False : tokenizer xs
+tokenizer ("|"     : xs) = Or            : tokenizer xs
+tokenizer ("&"     : xs) = And           : tokenizer xs
+tokenizer ("not"   : xs) = Not           : tokenizer xs
+tokenizer ("<"     : xs) = LessThan      : tokenizer xs
+tokenizer ("=="    : xs) = Is            : tokenizer xs
+tokenizer ("-"     : xs) = Minus         : tokenizer xs
+tokenizer ("+"     : xs) = Plus          : tokenizer xs
+tokenizer ("/"     : xs) = Div           : tokenizer xs
+tokenizer ("*"     : xs) = Times         : tokenizer xs
+tokenizer ("("     : xs) = OpenPar       : tokenizer xs
+tokenizer (")"     : xs) = ClosePar      : tokenizer xs
+tokenizer ("Let"   : xs) = Let           : tokenizer xs
+tokenizer ("In"    : xs) = In            : tokenizer xs
+tokenizer ("If"    : xs) = If            : tokenizer xs
+tokenizer ("Then"  : xs) = Then          : tokenizer xs
+tokenizer ("Else"  : xs) = Else          : tokenizer xs
+tokenizer (";"     : xs) = Semicolon     : tokenizer xs
+tokenizer ("="     : xs) = Equals        : tokenizer xs
+tokenizer ("True"  : xs) = Boolean True  : tokenizer xs
+tokenizer ("False" : xs) = Boolean False : tokenizer xs
+tokenizer []             = []
+tokenizer (x:xs)         = Name x : tokenizer xs
+
+tokenizerFinal xs = tokenizer $ wordyfier xs
+
+example3 = tokenizerFinal "f x = 3<4;" -- passt 
+
 
 -- read "123" :: Int
 -- 123
