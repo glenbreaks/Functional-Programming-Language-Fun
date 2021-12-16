@@ -66,6 +66,27 @@ tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
 tokenizer (x:xs)         = Name x : tokenizer xs
 
+checkInt :: Char -> Bool
+checkInt x = do
+    case x of
+        '0' -> True
+        '1' -> True
+        '2' -> True
+        '3' -> True
+        '4' -> True
+        '5' -> True
+        '6' -> True
+        '7' -> True
+        '8' -> True
+        '9' -> True
+        _   -> False
+
+checkNumber :: String -> Bool
+checkNumber (x:xs) = checkInt x && checkNumber xs
+checkNumber [] = True
+
+
+
 tokenizerFinal xs = tokenizer $ wordyfier xs
 
 example3 = tokenizerFinal "f x = 3<4;" -- passt 
