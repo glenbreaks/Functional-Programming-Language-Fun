@@ -12,13 +12,13 @@ OrExpr          ::= AndExpr ["|" OrExpr]
 AndExpr         ::= NotExpr ["&" AndExpr]
 NotExpr         ::= ["not"] CompareExpr
 CompareExpr     ::= AddExpr [("<" | "==") AddExpr]
-AddExpr         ::= MultExpr ["-" MultExpr2 | "+" RestAddExpr]
-RestAddExpr     ::= MultExpr2 ["+" RestAddExpr]
-MultExpr        ::= NegExpr ["/" AtomicExpr | "*" RestMultExpr]
+AddExpr         ::= MultExpr ["-" MultExpr2 | RestAddExpr]
+RestAddExpr     ::= e | "+" MultExpr2 RestAddExpr
+MultExpr        ::= NegExpr ["/" AtomicExpr | RestMultExpr]
 -- MultExpr2 is used after an operator instead of MultExpr to forbid
 -- the input of negation directly after an operator without parentheses
-MultExpr2       ::= AtomicExpr ["/" AtomicExpr | "*" RestMultExpr]
-RestMultExpr    ::= AtomicExpr ["*" RestMultExpr]
+MultExpr2       ::= AtomicExpr ["/" AtomicExpr | RestMultExpr]
+RestMultExpr    ::= e | "*" AtomicExpr RestMultExpr
 NegExpr         ::= ["-"] AtomicExpr
 AtomicExpr      ::= (Number | Boolean | "(" Expr ")" | Variable) RestAtomicExpr
 RestAtomicExpr  ::= e | (Number | Boolean | "(" Expr ")" | Variable) RestAtomicExpr
