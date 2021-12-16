@@ -22,30 +22,32 @@ data Token
     | Equals
     deriving (Eq, Show)
 
-preTokenizer :: String -> [String]
+preTokenizer :: String -> String
 preTokenizer xs = do
    case xs of
-       ';' : _  -> " ;" : preTokenizer (tail xs) -- leerzeichen danach?
-       '<' : _ -> " < " : preTokenizer (tail xs)
-    --    "==" -> 
-    --    "+"  -> 
-    --    "-"  -> 
-    --    "*"  -> 
-    --    "/"  -> 
-       []    -> []
-       xss    -> xss : preTokenizer (tail xs)
+       ';' : _  -> " ;" ++ preTokenizer (tail xs) -- leerzeichen danach?
+       '<' : _  -> " < " ++ preTokenizer (tail xs)
+       '=' : '=' : rest  -> " == " ++ preTokenizer (tail rest)
+       '+' : _  -> " + " ++ preTokenizer (tail xs)
+       '-' : _  -> " - " ++ preTokenizer (tail xs)
+       '*' : _  -> " * " ++ preTokenizer (tail xs)
+       '/' : _  -> " / " ++ preTokenizer (tail xs)
+       []        -> []
+       _         -> head xs : preTokenizer (tail xs)
+
+example = preTokenizer "f x == 3<4;" -- passt 
        
 
 -- Leerzeichen einfügen bei Semicolons, Plus, Minus, Times, DivBy, LessThan, Is
 
-tokenizer :: [String] -> [Token]
-tokenizer ("|" : xs)   = Or       : tokenizer xs
-tokenizer ("&" : xs)   = And      : tokenizer xs
-tokenizer ("not" : xs) = Not      : tokenizer xs
-tokenizer ("<" : xs)   = LessThan : tokenizer xs
-tokenizer ("==" : xs)  = Is       : tokenizer xs
-tokenizer ("-" : xs)   = Minus    : tokenizer xs
-tokenizer ("+" : xs)   = Plus     : tokenizer xs
+-- tokenizer :: [String] -> [Token]
+-- tokenizer ("|" : xs)   = Or       : tokenizer xs
+-- tokenizer ("&" : xs)   = And      : tokenizer xs
+-- tokenizer ("not" : xs) = Not      : tokenizer xs
+-- tokenizer ("<" : xs)   = LessThan : tokenizer xs
+-- tokenizer ("==" : xs)  = Is       : tokenizer xs
+-- tokenizer ("-" : xs)   = Minus    : tokenizer xs
+-- tokenizer ("+" : xs)   = Plus     : tokenizer xs
             -- "/"     -> Div      : tokenizer xs
             -- "*"     -> Times    : tokenizer xs
             -- "("     -> OpenPar  : tokenizer xs
