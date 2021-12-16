@@ -38,7 +38,9 @@ spaceyfier xs = do
 example = spaceyfier "f x == 3<4;" -- passt 
        
 wordyfier :: String -> [String]
-wordyfier xs = words $ unlines xs
+wordyfier xs = words $ spaceyfier xs
+
+example2 = wordyfier "f x == 3<4;"
 
 tokenizer :: [String] -> [Token]
 tokenizer x = do
