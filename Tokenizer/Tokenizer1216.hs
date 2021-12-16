@@ -9,7 +9,7 @@ data Token
     | Is
     | Minus
     | Plus
-    | Div
+    | DivBy
     | Times
     | OpenPar
     | ClosePar
@@ -25,15 +25,15 @@ data Token
 spaceyfier :: String -> String
 spaceyfier xs = do
    case xs of
-       ';' : _  -> " ;" ++ spaceyfier (tail xs) -- leerzeichen danach?
-       '<' : _  -> " < " ++ spaceyfier (tail xs)
-       '=' : '=' : rest  -> " == " ++ spaceyfier (tail rest)
-       '+' : _  -> " + " ++ spaceyfier (tail xs)
-       '-' : _  -> " - " ++ spaceyfier (tail xs)
-       '*' : _  -> " * " ++ spaceyfier (tail xs)
-       '/' : _  -> " / " ++ spaceyfier (tail xs)
-       []        -> []
-       _         -> head xs : spaceyfier (tail xs)
+       ';' : _          -> " ;" ++ spaceyfier (tail xs) -- leerzeichen danach?
+       '<' : _          -> " < " ++ spaceyfier (tail xs)
+       '=' : '=' : rest -> " == " ++ spaceyfier (tail rest)
+       '+' : _          -> " + " ++ spaceyfier (tail xs)
+       '-' : _          -> " - " ++ spaceyfier (tail xs)
+       '*' : _          -> " * " ++ spaceyfier (tail xs)
+       '/' : _          -> " / " ++ spaceyfier (tail xs)
+       []               -> []
+       _                -> head xs : spaceyfier (tail xs)
 
 example = spaceyfier "f x == 3<4;" -- passt 
        
@@ -50,7 +50,7 @@ tokenizer ("<"     : xs) = LessThan      : tokenizer xs
 tokenizer ("=="    : xs) = Is            : tokenizer xs
 tokenizer ("-"     : xs) = Minus         : tokenizer xs
 tokenizer ("+"     : xs) = Plus          : tokenizer xs
-tokenizer ("/"     : xs) = Div           : tokenizer xs
+tokenizer ("/"     : xs) = DivBy           : tokenizer xs
 tokenizer ("*"     : xs) = Times         : tokenizer xs
 tokenizer ("("     : xs) = OpenPar       : tokenizer xs
 tokenizer (")"     : xs) = ClosePar      : tokenizer xs
