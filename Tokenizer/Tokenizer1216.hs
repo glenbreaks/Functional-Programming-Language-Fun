@@ -22,46 +22,49 @@ data Token
     | Equals
     deriving (Eq, Show)
 
-preTokenizer :: String -> String
-preTokenizer xs = do
+spaceyfier :: String -> String
+spaceyfier xs = do
    case xs of
-       ';' : _  -> " ;" ++ preTokenizer (tail xs) -- leerzeichen danach?
-       '<' : _  -> " < " ++ preTokenizer (tail xs)
-       '=' : '=' : rest  -> " == " ++ preTokenizer (tail rest)
-       '+' : _  -> " + " ++ preTokenizer (tail xs)
-       '-' : _  -> " - " ++ preTokenizer (tail xs)
-       '*' : _  -> " * " ++ preTokenizer (tail xs)
-       '/' : _  -> " / " ++ preTokenizer (tail xs)
+       ';' : _  -> " ;" ++ spaceyfier (tail xs) -- leerzeichen danach?
+       '<' : _  -> " < " ++ spaceyfier (tail xs)
+       '=' : '=' : rest  -> " == " ++ spaceyfier (tail rest)
+       '+' : _  -> " + " ++ spaceyfier (tail xs)
+       '-' : _  -> " - " ++ spaceyfier (tail xs)
+       '*' : _  -> " * " ++ spaceyfier (tail xs)
+       '/' : _  -> " / " ++ spaceyfier (tail xs)
        []        -> []
-       _         -> head xs : preTokenizer (tail xs)
+       _         -> head xs : spaceyfier (tail xs)
 
-example = preTokenizer "f x == 3<4;" -- passt 
+example = spaceyfier "f x == 3<4;" -- passt 
        
+wordyfier :: String -> [String]
+wordyfier xs = words $ unlines xs
 
--- Leerzeichen einfügen bei Semicolons, Plus, Minus, Times, DivBy, LessThan, Is
-
--- tokenizer :: [String] -> [Token]
--- tokenizer ("|" : xs)   = Or       : tokenizer xs
--- tokenizer ("&" : xs)   = And      : tokenizer xs
--- tokenizer ("not" : xs) = Not      : tokenizer xs
--- tokenizer ("<" : xs)   = LessThan : tokenizer xs
--- tokenizer ("==" : xs)  = Is       : tokenizer xs
--- tokenizer ("-" : xs)   = Minus    : tokenizer xs
--- tokenizer ("+" : xs)   = Plus     : tokenizer xs
-            -- "/"     -> Div      : tokenizer xs
-            -- "*"     -> Times    : tokenizer xs
-            -- "("     -> OpenPar  : tokenizer xs
-            -- ")"     -> ClosePar : tokenizer xs
-            -- "Let"   -> Let      : tokenizer xs
-            -- "In"    -> In       : tokenizer xs
-            -- "If"    -> If       : tokenizer xs
-            -- "Then"  -> Then     : tokenizer xs
-            -- "Else"  -> Else     : tokenizer xs
-            -- ";"     -> Semicolon: tokenizer xs
-            -- "="     -> Equals   : tokenizer xs
--- tokenizer ("True" : xs) = Boolean True : tokenizer xs
--- tokenizer
+tokenizer :: [String] -> [Token]
+tokenizer x = do
+    case x of
+        "|"     : xs -> Or            : tokenizer xs
+        "&"     : xs -> And           : tokenizer xs
+        "not"   : xs -> Not           : tokenizer xs
+        "<"     : xs -> LessThan      : tokenizer xs
+        "=="    : xs -> Is            : tokenizer xs
+        "-"     : xs -> Minus         : tokenizer xs
+        "+"     : xs -> Plus          : tokenizer xs
+        "/"     : xs -> Div           : tokenizer xs
+        "*"     : xs -> Times         : tokenizer xs
+        "("     : xs -> OpenPar       : tokenizer xs
+        ")"     : xs -> ClosePar      : tokenizer xs
+        "Let"   : xs -> Let           : tokenizer xs
+        "In"    : xs -> In            : tokenizer xs
+        "If"    : xs -> If            : tokenizer xs
+        "Then"  : xs -> Then          : tokenizer xs
+        "Else"  : xs -> Else          : tokenizer xs
+        ";"     : xs -> Semicolon     : tokenizer xs
+        "="     : xs -> Equals        : tokenizer xs
+        "True"  : xs -> Boolean True  : tokenizer xs
+        "False" : xs -> Boolean False : tokenizer xs
 
 -- read "123" :: Int
 -- 123
-
+-- main :: IO()
+-- main = tokenizer (wordyfier (spaceyfier x))
