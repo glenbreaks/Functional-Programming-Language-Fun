@@ -64,7 +64,10 @@ tokenizer ("="     : xs) = Equals        : tokenizer xs
 tokenizer ("True"  : xs) = Boolean True  : tokenizer xs
 tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
-tokenizer (x:xs)         = Name x : tokenizer xs
+tokenizer (x:xs)         = do
+    if checkNumber x then Number (read x) : tokenizer xs else Name x : tokenizer xs
+
+example4 = tokenizerFinal "f x = 3*4+25"
 
 checkInt :: Char -> Bool
 checkInt x = do
