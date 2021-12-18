@@ -21,6 +21,7 @@ data Token
     | Semicolon
     | Equals
     deriving (Eq, Show)
+    
 spaceyfier :: String -> String
 spaceyfier x = do
    case x of
