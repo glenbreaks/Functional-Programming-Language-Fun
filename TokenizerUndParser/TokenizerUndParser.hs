@@ -93,8 +93,6 @@ checkName (x:xs) = (isAlphaNum x || extraName x) && checkName xs
 checkName []     = True
 
 
-tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
-
 newtype Program = Program [Definition] deriving Show
 
 data Definition = Definition [Expression] Expression deriving Show
@@ -338,6 +336,8 @@ variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
 variable _             = Nothing
 
+
+tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
 example = spaceyfier "f x == 3<4;" -- passt 
 -- example2 = wordyfier "f x == 3<4;"
