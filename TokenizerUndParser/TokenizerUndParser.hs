@@ -1,3 +1,14 @@
+import Data.Char(isDigit, isAlpha, isAlphaNum) -- für isDigit
+import Control.Exception
+
+data CompilerException 
+    = InvalidName !String
+    -- |
+    -- |
+    deriving Show
+
+instance Exception CompilerException
+
 data Token
     = Number Integer
     | Name String
@@ -23,24 +34,23 @@ data Token
     deriving (Eq, Show)
 
 spaceyfier :: String -> String
-spaceyfier xs = do
-   case xs of
-       ';' : _          -> " ;" ++ spaceyfier (tail xs) -- leerzeichen danach?
-       '<' : _          -> " < " ++ spaceyfier (tail xs)
-       '=' : '=' : rest -> " == " ++ spaceyfier (tail rest)
-       '+' : _          -> " + " ++ spaceyfier (tail xs)
-       '-' : _          -> " - " ++ spaceyfier (tail xs)
-       '*' : _          -> " * " ++ spaceyfier (tail xs)
-       '/' : _          -> " / " ++ spaceyfier (tail xs)
-       []               -> []
-       _                -> head xs : spaceyfier (tail xs)
-
-example = spaceyfier "f x == 3<4;" -- passt 
-       
-wordyfier :: String -> [String]
-wordyfier xs = words $ spaceyfier xs
-
-example2 = wordyfier "f x == 3<4;"
+spaceyfier x = do
+   case x of
+       ';' : xs       -> " ;"   ++ spaceyfier xs -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
+       '|' : xs       -> " | "  ++ spaceyfier xs
+       '&' : xs       -> " & "  ++ spaceyfier xs
+       '<' : xs       -> " < "  ++ spaceyfier xs
+       '=' : '=' : xs -> " == " ++ spaceyfier xs
+       '=' : xs       -> " = "  ++ spaceyfier xs
+       '+' : xs       -> " + "  ++ spaceyfier xs
+       '-' : xs       -> " - "  ++ spaceyfier xs
+       '*' : xs       -> " * "  ++ spaceyfier xs
+       '/' : xs       -> " / "  ++ spaceyfier xs
+       '(' : xs       -> " ( "  ++ spaceyfier xs
+       ')' : xs       -> " ) "  ++ spaceyfier xs
+       []             -> []
+       _   : xs       -> head x : spaceyfier xs
+ 
 
 tokenizer :: [String] -> [Token]
 tokenizer ("|"     : xs) = Or            : tokenizer xs
@@ -50,47 +60,40 @@ tokenizer ("<"     : xs) = LessThan      : tokenizer xs
 tokenizer ("=="    : xs) = Is            : tokenizer xs
 tokenizer ("-"     : xs) = Minus         : tokenizer xs
 tokenizer ("+"     : xs) = Plus          : tokenizer xs
-tokenizer ("/"     : xs) = DivBy           : tokenizer xs
+tokenizer ("/"     : xs) = DivBy         : tokenizer xs
 tokenizer ("*"     : xs) = Times         : tokenizer xs
 tokenizer ("("     : xs) = OpenPar       : tokenizer xs
 tokenizer (")"     : xs) = ClosePar      : tokenizer xs
-tokenizer ("Let"   : xs) = Let           : tokenizer xs
-tokenizer ("In"    : xs) = In            : tokenizer xs
-tokenizer ("If"    : xs) = If            : tokenizer xs
-tokenizer ("Then"  : xs) = Then          : tokenizer xs
-tokenizer ("Else"  : xs) = Else          : tokenizer xs
+tokenizer ("let"   : xs) = Let           : tokenizer xs
+tokenizer ("in"    : xs) = In            : tokenizer xs
+tokenizer ("if"    : xs) = If            : tokenizer xs
+tokenizer ("then"  : xs) = Then          : tokenizer xs
+tokenizer ("else"  : xs) = Else          : tokenizer xs
 tokenizer (";"     : xs) = Semicolon     : tokenizer xs
 tokenizer ("="     : xs) = Equals        : tokenizer xs
-tokenizer ("True"  : xs) = Boolean True  : tokenizer xs
+tokenizer ("True"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
 tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
-tokenizer (x:xs)         = do
-    if checkNumber x then Number (read x) : tokenizer xs else Name x : tokenizer xs
-
-example4 = tokenizerFinal "f x = 3*4+25"
-
-checkInt :: Char -> Bool
-checkInt x = do
-    case x of
-        '0' -> True
-        '1' -> True
-        '2' -> True
-        '3' -> True
-        '4' -> True
-        '5' -> True
-        '6' -> True
-        '7' -> True
-        '8' -> True
-        '9' -> True
-        _   -> False
+tokenizer (x:xs)   -- tokenizer monadisch? um bei fehlern Nothing zu returnen
+    | checkNumber x                   = Number (read x) : tokenizer xs
+    | isAlpha (head x) && checkName x = Name x           : tokenizer xs
+    | otherwise                       = throw (InvalidName x)
 
 checkNumber :: String -> Bool
-checkNumber (x:xs) = checkInt x && checkNumber xs
-checkNumber [] = True
+checkNumber (x:xs) = isDigit x && checkNumber xs
+checkNumber []     = True
 
-tokenizerFinal xs = tokenizer $ wordyfier xs
+extraName :: Char -> Bool
+extraName '_'  = True
+extraName '\'' = True
+extraName xs   = False
 
-example3 = tokenizerFinal "f x = 3<4;" -- passt 
+checkName :: String -> Bool
+checkName (x:xs) = (isAlphaNum x || extraName x) && checkName xs
+checkName []     = True
+
+
+tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
 newtype Program = Program [Definition] deriving Show
 
@@ -99,10 +102,6 @@ data Definition = Definition [Expression] Expression deriving Show
 newtype LocDefs = LocDefs [LocDef] deriving Show
 
 data LocDef     = LocDef Expression Expression deriving Show
-
-tokUndPar xs = program $ tokenizerFinal xs
-
-example5 = tokUndPar "foo a b = a*b+123; bar x y = True == False;"
 
 data Expression
     = LetX      LocDefs Expression
@@ -338,3 +337,11 @@ restAtomicExpr xs                = return ([], xs)
 variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
 variable _             = Nothing
+
+
+example = spaceyfier "f x == 3<4;" -- passt 
+-- example2 = wordyfier "f x == 3<4;"
+-- example3 = tokenizerFinal "f x = 3<4;" -- passt 
+-- example4 = tokenizerFinal "f x = 3*4+25"
+example5 = tokUndPar "foo a b = a*b+123; bar x y = True == False;"
+example6 = tokenizer ["f", ";x", "23"] -- f;x
