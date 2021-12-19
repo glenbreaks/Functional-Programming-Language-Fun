@@ -1,3 +1,14 @@
+import Data.Char(isDigit, isAlpha, isAlphaNum)
+import Control.Exception (Exception, throw)
+
+data CompilerException 
+    = InvalidName !String
+    -- |
+    -- |
+    deriving Show
+
+instance Exception CompilerException
+
 data Token
     = Number Integer
     | Name String
@@ -21,7 +32,7 @@ data Token
     | Semicolon
     | Equals
     deriving (Eq, Show)
-    
+
 spaceyfier :: String -> String
 spaceyfier x = do
    case x of
@@ -63,7 +74,7 @@ tokenizer ("="     : xs) = Equals        : tokenizer xs
 tokenizer ("True"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
 tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
-tokenizer (x:xs)   -- tokenizer monadisch? um bei fehlern Nothing zu returnen
+tokenizer (x:xs)
     | checkNumber x                   = Number (read x) : tokenizer xs
     | isAlpha (head x) && checkName x = Name x           : tokenizer xs
     | otherwise                       = throw (InvalidName x)
@@ -72,14 +83,12 @@ checkNumber :: String -> Bool
 checkNumber (x:xs) = isDigit x && checkNumber xs
 checkNumber []     = True
 
-extraName :: Char -> Bool
-extraName '_'  = True
-extraName '\'' = True
-extraName xs   = False
+-- extraName :: Char -> Bool
+-- extraName '_'  = True
+-- extraName '\'' = True
+-- extraName xs   = False
 
 checkName :: String -> Bool
-checkName (x:xs) = (isAlphaNum x || extraName x) && checkName xs
+-- checkName (x:xs) = (isAlphaNum x || extraName x) && checkName xs
+checkName (x:xs) = (isAlphaNum x || x == '_' || x == '\'') && checkName xs
 checkName []     = True
-
-
-tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
