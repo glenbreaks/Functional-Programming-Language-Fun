@@ -50,7 +50,6 @@ spaceyfier x = do
        ')' : xs       -> " ) "  ++ spaceyfier xs
        []             -> []
        _   : xs       -> head x : spaceyfier xs
- 
 
 tokenizer :: [String] -> [Token]
 tokenizer ("|"     : xs) = Or            : tokenizer xs
