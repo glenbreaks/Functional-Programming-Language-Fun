@@ -45,3 +45,33 @@ data HeapCell
 type Type  = Int    -- 1 = Bool, 0 = Zahl
 type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 
+
+compileProgram :: [Definition] -> State
+-- compileProgram (x:xs) = compileDef x & compileProgram xs
+-- compileProgram [] = []
+
+compileDef :: [Expression] Expression -> State
+
+compileLocDefs :: [LocDef] -> State
+
+compileLocDef :: Expression Expression -> State
+
+compileExpr :: Expression -> State
+
+compileOrExpr :: Expression -> State
+
+compileAndExpr :: Expression -> State
+
+compileNotExpr :: Expression -> State
+
+compileCompareExpr :: Expression -> State
+
+compileAddExpr :: Expression -> State
+
+compileMultExpr :: Expression -> State
+
+compileNegExpr :: Expression -> State
+
+compileAtomicExpr :: Expression -> State
+
+compileVariable :: Expression -> State
