@@ -1,4 +1,4 @@
-data Instruction = Instruction
+data Instruction -- = Instruction
     = Reset
     | Pushfun String
     | Pushval Type Value
@@ -33,9 +33,9 @@ data State = State
         global :: Global
     }
 
-newtype Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
-newtype Heap   = [HeapCell]
-newtype Global = (String, Int)
+type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
+type Heap   = [HeapCell]
+type Global = [(String, Int)]
 
 data HeapCell 
     = APP HeapCell HeapCell -- Konstruktor für Knoten
@@ -51,6 +51,17 @@ compileProgram :: [Definition] -> State
 -- compileProgram [] = []
 
 compileDef :: [Expression] Expression -> State
+compileDef (f:xs) y = 
+    -- let n   = length xs
+-- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
+-- heap = heap ++ DEF f n L
+-- global = global ++ (f, addr DEF f)
+
+posifyer :: [Expression] -> [(Expression,Int)]
+posifyer xs = pos xs 1
+    where 
+        pos [] _ = []
+        pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
 compileLocDefs :: [LocDef] -> State
 
