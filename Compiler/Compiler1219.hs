@@ -97,20 +97,19 @@ compileProgram xs = 0 ([Reset, Pushfun main, Call, Halt] ++ cProg xs) [] [] []
         cProg []     = []
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (fun:args) body) = compileExpr body localEnv ++ [Slide 1, Reduce, Return]
+compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) ++ [Slide 1, Reduce, Return]
 -- let n   = length xs
 -- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
 -- heap = heap ++ DEF f n L
 -- global = global ++ (f, addr DEF f)
 
-compileLocDefs :: [LocDef] -> [Instruction]
-
 -- compileLocDef :: Expression -> Expression -> [Instruction]
 
 compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
-compileExpr (LetX      a b)   ((u,v):xs) = ... compareExpr u xs
+compileExpr 
+compileExpr (LetX      a b)   ((u,v):xs) = ... compareExpr u xs   compileLocDefs 
 compileExpr (IfX       a b c) env = 
-compileExpr (OrX       a b)   env = 
+compileExpr (OrX       a b)   env = compileExpr a 
 compileExpr (AndX      a b)   env = 
 compileExpr (NotX      a)     env = 
 compileExpr (LessThanX a b)   env = 
@@ -125,6 +124,9 @@ compileExpr (Val       a)     env = Pushval Num a
 compileExpr (BoolVal   a)     env = Pushval Bool w -- w ist 0 oder 1  
     -- if a == False then Pushval Bool 0 else Pushval Bool 1
 compileExpr (Variable  a)     env = Pushparam (snd env)
+
+compileLocDefs :: [LocDef] -> [Instruction]
+compileLocDefs 
 
 -- compileOrExpr :: Expression -> State
 
