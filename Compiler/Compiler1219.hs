@@ -108,23 +108,23 @@ compileLocDefs :: [LocDef] -> [Instruction]
 -- compileLocDef :: Expression -> Expression -> [Instruction]
 
 compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
-compileExpr (LetX      a b)   ((u,v):xs)) = ... compareExpr u xs
-compileExpr (IfX       a b c) env) = 
-compileExpr (OrX       a b)   env) = 
-compileExpr (AndX      a b)   env) = 
-compileExpr (NotX      a)     env) = 
-compileExpr (LessThanX a b)   env) = 
-compileExpr (IsX       a b)   env) = 
-compileExpr (Diff      a b)   env) = 
-compileExpr (Sum       a b)   env) = 
-compileExpr (Div       a b)   env) = 
-compileExpr (Mult      a b)   env) = 
-compileExpr (Neg       a)     env) = 
-compileExpr (Function  a b)   env) = Pushfun a
-compileExpr (Val       a)     env) = Pushval Num a
-compileExpr (BoolVal   a)     env) = Pushval Bool w -- w ist 0 oder 1  
+compileExpr (LetX      a b)   ((u,v):xs) = ... compareExpr u xs
+compileExpr (IfX       a b c) env = 
+compileExpr (OrX       a b)   env = 
+compileExpr (AndX      a b)   env = 
+compileExpr (NotX      a)     env = 
+compileExpr (LessThanX a b)   env = 
+compileExpr (IsX       a b)   env = 
+compileExpr (Diff      a b)   env = 
+compileExpr (Sum       a b)   env = 
+compileExpr (Div       a b)   env = 
+compileExpr (Mult      a b)   env = 
+compileExpr (Neg       a)     env = 
+compileExpr (Function  a b)   env = Pushfun a
+compileExpr (Val       a)     env = Pushval Num a
+compileExpr (BoolVal   a)     env = Pushval Bool w -- w ist 0 oder 1  
     -- if a == False then Pushval Bool 0 else Pushval Bool 1
-compileExpr (Variable  a)     env) = Pushparam (snd env)
+compileExpr (Variable  a)     env = Pushparam (snd env)
 
 -- compileOrExpr :: Expression -> State
 
