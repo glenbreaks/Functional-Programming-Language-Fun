@@ -23,12 +23,6 @@ data Instruction
     -- }
     -- | ...
 
-data Op 
-    = Unary 
-    | Binary
-    | If
-    deriving Show 
-    
 data Expression
     = LetX      LocDefs Expression
     | IfX       Expression Expression Expression
@@ -67,9 +61,21 @@ data HeapCell
     | VAL Type Value        -- Blätter
     | IND Int               -- HeapAdress
     | PRE Op
+    deriving Show
 
 type Type  = Int    -- 1 = Bool, 0 = Zahl
 type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
+
+data Arg 
+    = Op 
+    | N Int
+    deriving Show
+
+data Op
+    = "1"
+    | "2"
+    | "if"
+    deriving Show
 
 -- data Op
 --     = If
@@ -84,29 +90,39 @@ type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 --     | Not
 --     deriving (Eq, Show) -- Token?
 
-arity :: Expression -> Op   
-arity NotX = Unary 
-arity NegX = Unary 
-arity If   = If 
-arity  _   = Binary 
-
+arity :: Expression -> Op 
+arity NotX  = "1"
+arity NegX  = "1" 
+arity IfX   = "if"
+arity  _    = "2"
+ 
 posifyer :: [Expression] -> [(Expression,Int)]
 posifyer xs = pos xs 1
     where 
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
+compileMain :: Definition -> [Instruction]
+compileMain (Definition [Variable "main"] body) = [Reset, Pushfun "main", Call, Halt, Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator 2, Update op, Return, --BinärOp
+                                                            Pushparam 1, Unwind, Call, Operator "if", Update op, Unwind, Call, Return                                               --If
+                                                            Pushparam 1, Unwind, Call, Operator 1, Update op, Return]                                                               --UnärOp
+                                                            ++ compileExpr body [] ++ [Slide 1, Unwind, Call, Return]
+compileMain _ = []
+-- Exception throwen?
+
 compileProgram :: [Definition] -> State
--- compileProgram (x:xs) = compileDef x & compileProgram xs
--- compileProgram [] = []
-compileProgram xs = 0 ([Reset, Pushfun main, Call, Halt] ++ cProg xs) [] [] []
+compileProgram x:xs = 0 compileMain x ++ cProg xs [] [] []
     where
         cProg (x:xs) = compileDef x : cProg xs
         cProg []     = []
+-- HeapCells hier aufbauen ?
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) ++ [Slide 1, Reduce, Return]
-compileDef (Definition (fun:args) body) = 
+compileDef (Definition (fun:args) body) = (Pushfun fun) : paramizer (posifyer args) ++ compileExpr body (posifyer args) ++ [Slide ((length args) + 1), Unwind, Call, Return]
+    where   
+        paramizer (x, y):xs = (Pushparam y) : paramizer xs
+        paramizer []        = []
+
 -- let n   = length args     -- Stelligkeit von fun
 -- let a   = length args + 1 -- Länge des Anwendungsgraphen
 -- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
@@ -120,9 +136,9 @@ compileExpr
 compileExpr (LetX      a b)   ((u,v):xs) = ... compileExpr u xs   compileLocDefs 
 compileExpr x ((u,v):xs) = 
     case arity x of 
-        Unary  -> [Pushparam 1, Unwind, Call, Operator Unary, Update 1, Return]
-        Binary -> [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator Binary, Update 2, Return]
-        If     -> [Pushparam 1, Unwind, Call, Operator If, Update ]
+        "1"  -> [Pushparam 1, Unwind, Call, Operator 1, Update 1, Return]
+        "2"  -> [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator 2, Update 2, Return]
+        "if" -> 
 compileExpr (IfX       a b c) env = 
 compileExpr (OrX       a b)   env = compileExpr a 
 compileExpr (AndX      a b)   env = 
