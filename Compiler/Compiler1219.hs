@@ -23,6 +23,12 @@ data Instruction
     -- }
     -- | ...
 
+data Op 
+    = Unary 
+    | Binary
+    | If
+    deriving Show 
+    
 data Expression
     = LetX      LocDefs Expression
     | IfX       Expression Expression Expression
@@ -78,10 +84,11 @@ type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 --     | Not
 --     deriving (Eq, Show) -- Token?
 
-isUnaryExpr :: Expression -> Bool 
-isUnaryExpr NotX = True
-isUnaryExpr NegX = True 
-isUnaryExpr _    = False 
+arity :: Expression -> Op   
+arity NotX = Unary 
+arity NegX = Unary 
+arity If   = If 
+arity  _   = Binary 
 
 posifyer :: [Expression] -> [(Expression,Int)]
 posifyer xs = pos xs 1
@@ -99,6 +106,7 @@ compileProgram xs = 0 ([Reset, Pushfun main, Call, Halt] ++ cProg xs) [] [] []
 
 compileDef :: Definition -> [Instruction]
 compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) ++ [Slide 1, Reduce, Return]
+compileDef (Definition (fun:args) body) = 
 -- let n   = length args     -- Stelligkeit von fun
 -- let a   = length args + 1 -- Länge des Anwendungsgraphen
 -- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
@@ -111,9 +119,10 @@ compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
 compileExpr 
 compileExpr (LetX      a b)   ((u,v):xs) = ... compileExpr u xs   compileLocDefs 
 compileExpr x ((u,v):xs) = 
-    case isUnaryExpr x of 
-        True  -> return [Pushparam 1, Unwind, ]
-        _     -> 
+    case arity x of 
+        Unary  -> [Pushparam 1, Unwind, Call, Operator Unary, Update 1, Return]
+        Binary -> [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator Binary, Update 2, Return]
+        If     -> [Pushparam 1, Unwind, Call, Operator If, Update ]
 compileExpr (IfX       a b c) env = 
 compileExpr (OrX       a b)   env = compileExpr a 
 compileExpr (AndX      a b)   env = 

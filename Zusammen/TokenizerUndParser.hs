@@ -340,3 +340,5 @@ example = spaceyfier "f x == 3<4;" -- passt
 example5 = tokUndPar "foo a b = a*b+123; bar x y = True == False;"
 example6 = tokenizer ["f", ";x", "23"] -- f;x
 f x y z = 5
+
+ex7 = tokUndPar "quadrat x = x * x;"
