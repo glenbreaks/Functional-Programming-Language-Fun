@@ -1,4 +1,4 @@
-data Instruction -- = Instruction
+data Instruction
     = Reset
     | Pushfun String
     | Pushval Type Value
@@ -14,6 +14,7 @@ data Instruction -- = Instruction
     | Pushpre Op -- Op definieren
     | Update Arg
     | Operator Op
+    deriving Show
     -- {
     --     address :: String        -> Int
     --     add2arg :: HeapCell      -> HeapCell
@@ -41,11 +42,6 @@ data Expression
     | Variable  String
     deriving Show
 
--- data Stack = Stack []
--- data Heap = APP HeapCell HeapCell
--- data Global
--- data State = State (Int, [Instruction], Stack, Heap, Global)
-
 data State = State
     {
         pc     :: Int,
@@ -69,18 +65,23 @@ data HeapCell
 type Type  = Int    -- 1 = Bool, 0 = Zahl
 type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 
-data Op
-    = If
-    | Or
-    | And
-    | LessThan
-    | Is
-    | Plus
-    | Minus
-    | Times
-    | DivBy
-    | Not
-    deriving (Eq, Show) -- Token?
+-- data Op
+--     = If
+--     | Or
+--     | And
+--     | LessThan
+--     | Is
+--     | Plus
+--     | Minus
+--     | Times
+--     | DivBy
+--     | Not
+--     deriving (Eq, Show) -- Token?
+
+isUnaryExpr :: Expression -> Bool 
+isUnaryExpr NotX = True
+isUnaryExpr NegX = True 
+isUnaryExpr _    = False 
 
 posifyer :: [Expression] -> [(Expression,Int)]
 posifyer xs = pos xs 1
@@ -98,7 +99,8 @@ compileProgram xs = 0 ([Reset, Pushfun main, Call, Halt] ++ cProg xs) [] [] []
 
 compileDef :: Definition -> [Instruction]
 compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) ++ [Slide 1, Reduce, Return]
--- let n   = length xs
+-- let n   = length args     -- Stelligkeit von fun
+-- let a   = length args + 1 -- Länge des Anwendungsgraphen
 -- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
 -- heap = heap ++ DEF f n L
 -- global = global ++ (f, addr DEF f)
@@ -107,7 +109,11 @@ compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) ++ [S
 
 compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
 compileExpr 
-compileExpr (LetX      a b)   ((u,v):xs) = ... compareExpr u xs   compileLocDefs 
+compileExpr (LetX      a b)   ((u,v):xs) = ... compileExpr u xs   compileLocDefs 
+compileExpr x ((u,v):xs) = 
+    case isUnaryExpr x of 
+        True  -> return [Pushparam 1, Unwind, ]
+        _     -> 
 compileExpr (IfX       a b c) env = 
 compileExpr (OrX       a b)   env = compileExpr a 
 compileExpr (AndX      a b)   env = 
@@ -123,7 +129,7 @@ compileExpr (Function  a b)   env = Pushfun a
 compileExpr (Val       a)     env = Pushval Num a
 compileExpr (BoolVal   a)     env = Pushval Bool w -- w ist 0 oder 1  
     -- if a == False then Pushval Bool 0 else Pushval Bool 1
-compileExpr (Variable  a)     env = Pushparam (snd env)
+compileExpr (Variable  a)     ((u,v):xs) = Pushparam v
 
 compileLocDefs :: [LocDef] -> [Instruction]
 compileLocDefs 
