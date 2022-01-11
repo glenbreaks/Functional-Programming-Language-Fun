@@ -272,7 +272,7 @@ restAddExpr (Plus : xs1)  = do
     (e, xs2)  <- multExpr2 xs1              -- damit 5+-2 nicht geht
     (es, xs3) <- restAddExpr xs2
     return (e:es, xs3)
--- restAddExpr (Minus : xs1) = do
+-- restAddExpr (Minus : xs1) = do -- würde ermöglichen: a + b - c, diese eingaben sind aber nicht erlaubt da + und - dieselbe Präzedenz haben
 --     (e, xs1) <-  multExpr xs1
 --     return ([Neg e], xs1)
 restAddExpr xs            = return ([], xs)
