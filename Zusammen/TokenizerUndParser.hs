@@ -248,6 +248,9 @@ compareExpr xs1 = do
             return (IsX e es, xs4)
         _              -> return (e, xs2)
 
+ex6 = expr [Boolean True, Or, Boolean False]
+ex7 = expr [Boolean True, Is, Boolean True, Or, Boolean False]
+ex8 = expr [Number 2, LessThan, Number 3, LessThan, Number 4] --hier wird Code nicht fertig geparsed, nichtleere Liste wird in program abgefangen -> Nothing
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -269,6 +272,9 @@ restAddExpr (Plus : xs1)  = do
     (e, xs2)  <- multExpr2 xs1              -- damit 5+-2 nicht geht
     (es, xs3) <- restAddExpr xs2
     return (e:es, xs3)
+-- restAddExpr (Minus : xs1) = do
+--     (e, xs1) <-  multExpr xs1
+--     return ([Neg e], xs1)
 restAddExpr xs            = return ([], xs)
 
 multExpr :: Parser Expression
@@ -350,6 +356,8 @@ variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
 variable _             = Nothing
 
-
 tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
+ex9 = addExpr [Number 5, Plus, Minus, Number 2] -- erklärung multexpr 2
+ex10 = addExpr [Number 1 , Plus, Number 2, Minus, Number 3, Minus, Number 5] -- 3-2+1= 0 / 2
+ex11 = addExpr [Number 1 , Minus, Number 2, Minus, Number 3]
