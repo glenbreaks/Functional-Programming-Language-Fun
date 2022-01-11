@@ -3,8 +3,8 @@ import Control.Exception (Exception, throw)
 
 data CompilerException 
     = InvalidName !String
-    -- |
-    -- |
+    | MissingMain 
+    | Undefined 
     deriving Show
 
 instance Exception CompilerException
@@ -33,10 +33,41 @@ data Token
     | Equals
     deriving (Eq, Show)
 
+data Expression
+    = LetX      LocDefs Expression
+    | IfX       Expression Expression Expression
+    | OrX       Expression Expression
+    | AndX      Expression Expression
+    | NotX      Expression
+    | LessThanX Expression Expression
+    | IsX       Expression Expression
+    | Diff      Expression Expression
+    | Sum       Expression Expression
+    | Div       Expression Expression
+    | Mult      Expression Expression
+    | Neg       Expression
+    | Function  Expression Expression
+    | Val       Integer
+    | BoolVal   Bool
+    | Variable  String
+    deriving Show
+
+newtype Program = Program [Definition] deriving Show
+
+data Definition = Definition [Expression] Expression deriving Show
+
+newtype LocDefs = LocDefs [LocDef] deriving Show
+
+data LocDef     = LocDef Expression Expression deriving Show
+
+type Parser a = [Token] -> Maybe (a, [Token])
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
 spaceyfier :: String -> String
 spaceyfier x = do
    case x of
-       ';' : xs       -> " ;"   ++ spaceyfier xs -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
+       ';' : xs       -> " ;"   ++ spaceyfier xs        -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
        '|' : xs       -> " | "  ++ spaceyfier xs
        '&' : xs       -> " & "  ++ spaceyfier xs
        '<' : xs       -> " < "  ++ spaceyfier xs
@@ -75,7 +106,7 @@ tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
 tokenizer (x:xs)
     | checkNumber x                   = Number (read x) : tokenizer xs
-    | isAlpha (head x) && checkName x = Name x           : tokenizer xs
+    | isAlpha (head x) && checkName x = Name x          : tokenizer xs
     | otherwise                       = throw (InvalidName x)
 
 checkNumber :: String -> Bool
@@ -86,35 +117,14 @@ checkName :: String -> Bool
 checkName (x:xs) = (isAlphaNum x || x == '_' || x == '\'') && checkName xs
 checkName []     = True
 
+ex1 = tokenizer ["main", "=", "foo", "x", "y", "=", "2", "*", "x", "+", "y", ";"]
+ex2 = tokenizer $ words $ spaceyfier "f a b c = 2*a + 3*x /4;"
+ex3 = tokenizer ["f", ";x", "23", ";"] -- False (Exception: InvalidName)
 
-newtype Program = Program [Definition] deriving Show
+-- tokenizer $ words $ spaceyfier xs
 
-data Definition = Definition [Expression] Expression deriving Show
 
-newtype LocDefs = LocDefs [LocDef] deriving Show
-
-data LocDef     = LocDef Expression Expression deriving Show
-
-data Expression
-    = LetX      LocDefs Expression
-    | IfX       Expression Expression Expression
-    | OrX       Expression Expression
-    | AndX      Expression Expression
-    | NotX      Expression
-    | LessThanX Expression Expression
-    | IsX       Expression Expression
-    | Diff      Expression Expression
-    | Sum       Expression Expression
-    | Div       Expression Expression
-    | Mult      Expression Expression
-    | Neg       Expression
-    | Function  Expression Expression
-    | Val       Integer
-    | BoolVal   Bool
-    | Variable  String
-    deriving Show
-
-type Parser a = [Token] -> Maybe (a, [Token])
+----------------------------------------------------------------------------------------------------------------------------------------------
 
 program :: Parser Program
 program xs1 = do
@@ -124,7 +134,7 @@ program xs1 = do
             (es, xs4) <- restProgram xs3
             case xs4 of
                 [] -> return (Program (e:es), xs4)
-                _  -> Nothing
+                _  -> Nothing     -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
         _               -> Nothing
 
 restProgram :: Parser [Definition]
@@ -174,6 +184,12 @@ locDef xs1 = do
             (es, xs4) <- expr xs3
             return (LocDef e es, xs4)
         _            -> Nothing
+
+ex4 = program [Name "main", Equals, Number 1, Plus, Number 2, Semicolon]
+ex5 = locDef [Name "x", Equals, Not, Boolean True]
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------
 
 expr :: Parser Expression
 expr (Let : xs1) = do
@@ -232,12 +248,16 @@ compareExpr xs1 = do
             return (IsX e es, xs4)
         _              -> return (e, xs2)
 
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
 addExpr :: Parser Expression
 addExpr xs1 = do
     (e, xs2)  <- multExpr xs1
     case xs2 of 
         Minus : xs3 -> do
-            (es, xs4) <- multExpr2 xs3 -- damit 5--2 nicht geht
+            (es, xs4) <- multExpr2 xs3      -- damit 5--2 nicht geht
             return (Diff e es, xs4)
         Plus :  _   -> do
             (es, xs3) <- restAddExpr xs2
@@ -246,7 +266,7 @@ addExpr xs1 = do
 
 restAddExpr :: Parser [Expression]
 restAddExpr (Plus : xs1)  = do
-    (e, xs2)  <- multExpr2 xs1 -- damit 5+-2 nicht geht
+    (e, xs2)  <- multExpr2 xs1              -- damit 5+-2 nicht geht
     (es, xs3) <- restAddExpr xs2
     return (e:es, xs3)
 restAddExpr xs            = return ([], xs)
@@ -256,14 +276,14 @@ multExpr xs1 = do
     (e, xs2)  <- negExpr xs1
     case xs2 of 
         DivBy : xs3 -> do
-            (es, xs4) <- atomicExpr xs3 -- negExpr übersprungen, damit 5/-2 nicht geht
+            (es, xs4) <- atomicExpr xs3     -- negExpr übersprungen, damit 5/-2 nicht geht
             return (Div e es, xs4)
         Times : _   -> do
             (es, xs3) <- restMultExpr xs2
             return (foldl Mult e es, xs3)
         _           -> return (e, xs2)
 
-multExpr2 :: Parser Expression -- falls keine Negation möglich sein soll, zB (5--3) ist doof
+multExpr2 :: Parser Expression              -- falls keine Negation möglich sein soll, zB (5--3) ist doof
 multExpr2 xs1 = do
     (e, xs2)  <- atomicExpr xs1
     case xs2 of 
@@ -277,7 +297,7 @@ multExpr2 xs1 = do
 
 restMultExpr :: Parser [Expression]
 restMultExpr (Times : xs1) = do
-    (e, xs2)  <- atomicExpr xs1 -- damit 5--2 nicht geht
+    (e, xs2)  <- atomicExpr xs1             -- damit 5--2 nicht geht
     (es, xs3) <- restMultExpr xs2
     return (e:es, xs3)
 restMultExpr xs            = return ([], xs)
@@ -333,12 +353,3 @@ variable _             = Nothing
 
 tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
-example = spaceyfier "f x == 3<4;" -- passt 
--- example2 = wordyfier "f x == 3<4;"
--- example3 = tokenizerFinal "f x = 3<4;" -- passt 
--- example4 = tokenizerFinal "f x = 3*4+25"
-example5 = tokUndPar "foo a b = a*b+123; bar x y = True == False;"
-example6 = tokenizer ["f", ";x", "23"] -- f;x
-f x y z = 5
-
-ex7 = tokUndPar "quadrat x = x * x;"
