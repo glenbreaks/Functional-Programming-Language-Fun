@@ -53,9 +53,9 @@ data Expression
 
 newtype Program = Program [Definition] deriving Show
 
-data Definition = Definition [Expression] Expression
-instance Show Definition
-    where show (Definition (Variable a : _)_) = a
+data Definition = Definition [Expression] Expression deriving Show
+-- instance Show Definition
+--     where show (Definition (Variable a : _)_) = a
 
 newtype LocDefs = LocDefs [LocDef] deriving Show
 
@@ -127,6 +127,10 @@ ex3 = tokenizer ["f", ";x", "23", ";"] -- False (Exception: InvalidName)
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
+--hilfsfunktion für fehlermeldungen
+show2 :: Definition -> String
+show2 (Definition (Variable a : _)_) = a
+
 program :: Parser Program
 program xs1 = do
     (e, xs2)  <- def xs1
@@ -136,7 +140,7 @@ program xs1 = do
             case xs4 of
                 []    -> return (Program (e:es), xs4)
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
-        _               -> Left ("Semicolon expected after definition " ++ show e)
+        _               -> Left ("Semicolon expected after definition " ++ show2 e)
 
 restProgram :: Parser [Definition]
 restProgram xs1 = do
@@ -147,7 +151,7 @@ restProgram xs1 = do
                 Semicolon : xs3 -> do
                     (es, xs4) <- restProgram xs3
                     return (e:es, xs4)
-                _               -> Left ("Semicolon expected after definition " ++ show e)
+                _               -> Left ("Semicolon expected after definition " ++ show2 e)
         _          -> return ([], xs1)
 
 def :: Parser Definition
