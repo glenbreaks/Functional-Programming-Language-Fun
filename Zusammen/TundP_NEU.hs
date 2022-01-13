@@ -166,7 +166,7 @@ restDef (Name i : xs1) = do
     (is, xs2) <- restDef xs1
     return (Variable i:is, xs2)
 restDef (Equals : xs1) = return ([], xs1)
-restDef (x:_)          = Left ("Expected: '=' \nActual: " ++ show x)
+restDef (x:_)          = Left ("Expected: '=', Actual: " ++ show x)
 
 locDefs :: Parser LocDefs
 locDefs xs1 = do
@@ -188,7 +188,7 @@ locDef xs1 = do
         Equals : xs3 -> do
             (es, xs4) <- expr xs3
             return (LocDef e es, xs4)
-        (x:_)        -> Left ("Expected: '=' \nActual: " ++ show x)
+        (x:_)        -> Left ("Expected: '=', Actual: " ++ show x)
 
 ex4 = program [Name "main", Equals, Number 1, Plus, Number 2, Semicolon]
 ex5 = locDef [Name "x", Equals, Not, Boolean True]
@@ -203,7 +203,7 @@ expr (Let : xs1) = do
         In : xs3 -> do
             (es, xs4) <- expr xs3
             return (LetX e es, xs4)
-        (x:_)    -> Left ("Expected: 'in' \nActual: " ++ show x)
+        (x:_)    -> Left ("Expected: 'in', Actual: " ++ show x)
 expr (If : xs1)  = do
     (e1, xs2) <- expr xs1
     case xs2 of
@@ -213,8 +213,8 @@ expr (If : xs1)  = do
                 Else : xs5 -> do
                     (es, xs6) <- expr xs5
                     return (IfX e1 e2 es, xs6)
-                (x:_)      -> Left ("Expected: 'else' \nActual: " ++ show x)
-        (x:_)      -> Left ("Expected: 'then' \nActual: " ++ show x)
+                (x:_)      -> Left ("Expected: 'else', Actual: " ++ show x)
+        (x:_)      -> Left ("Expected: 'then', Actual: " ++ show x)
 expr xs          = orExpr xs
 
 orExpr :: Parser Expression
@@ -319,11 +319,11 @@ atomicExpr (OpenPar : xs1)   = do
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
             return (foldl Function e es, xs4)
-        (x:_)          -> Left ("Expected: ')' \nActual: " ++ show x)
+        (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
 atomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (foldl Function (Variable i) is, xs2)
-atomicExpr (x:_)             = Left ("Expected: number, boolean or variable \nActual: " ++ show x)
+atomicExpr (x:_)             = Left ("Expected: number, boolean or variable, Actual: " ++ show x)
 
 restAtomicExpr :: Parser [Expression]
 restAtomicExpr (Number i : xs1)  = do
@@ -338,7 +338,7 @@ restAtomicExpr (OpenPar : xs1)   = do
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
             return (e:es, xs4)
-        (x:_)          -> Left ("Expected: ')' \nActual: " ++ show x)
+        (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
 restAtomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (Variable i:is, xs2)
@@ -346,7 +346,7 @@ restAtomicExpr xs                = return ([], xs)
 
 variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
-variable (x:_)         = Left ("Expected: variable \nActual: " ++ show x)
+variable (x:_)         = Left ("Expected: variable, Actual: " ++ show x)
 
 tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
