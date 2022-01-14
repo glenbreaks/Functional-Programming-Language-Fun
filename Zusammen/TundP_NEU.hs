@@ -41,9 +41,8 @@ data Expression
     | NotX      Expression
     | LessThanX Expression Expression
     | IsX       Expression Expression
-    | Diff      Expression Expression
     | Sum       Expression Expression
-    | Div       Expression Expression
+    | NegExpo   Expression -- x hoch minus 1 = 1/x
     | Mult      Expression Expression
     | Neg       Expression
     | Function  Expression Expression
@@ -60,12 +59,12 @@ newtype LocDefs = LocDefs [LocDef] deriving Show
 
 data LocDef     = LocDef Expression Expression deriving Show
 
-type Parser a = [Token] -> Maybe (a, [Token])
+type Parser a = [Token] -> Either String (a, [Token])
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
 spaceyfier :: String -> String
-spaceyfier x = 
+spaceyfier x = do
    case x of
        ';' : xs       -> " ;"   ++ spaceyfier xs        -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
        '|' : xs       -> " | "  ++ spaceyfier xs
@@ -101,13 +100,13 @@ tokenizer ("then"  : xs) = Then          : tokenizer xs
 tokenizer ("else"  : xs) = Else          : tokenizer xs
 tokenizer (";"     : xs) = Semicolon     : tokenizer xs
 tokenizer ("="     : xs) = Equals        : tokenizer xs
-tokenizer ("True"  : xs) = Boolean True  : tokenizer xs 
+tokenizer ("True"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
 tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
 tokenizer (x:xs)
     | checkNumber x                   = Number (read x) : tokenizer xs
     | isAlpha (head x) && checkName x = Name x          : tokenizer xs
-    | otherwise                       = throw (InvalidName x) 
+    | otherwise                       = throw (InvalidName x)
 
 checkNumber :: String -> Bool
 checkNumber (x:xs) = isDigit x && checkNumber xs
@@ -117,14 +116,18 @@ checkName :: String -> Bool
 checkName (x:xs) = (isAlphaNum x || x == '_' || x == '\'') && checkName xs
 checkName []     = True
 
-tokenize xs = tokenizer $ words $ spaceyfier xs
-
 ex1 = tokenizer ["main", "=", "foo", "x", "y", "=", "2", "*", "x", "+", "y", ";"]
-ex2 = tokenize "f a b c = 2*a + 3*x/4;"
+ex2 = tokenizer $ words $ spaceyfier "f a b c = 2*a + 3*x /4;"
 ex3 = tokenizer ["f", ";x", "23", ";"] -- False (Exception: InvalidName)
+
+-- tokenizer $ words $ spaceyfier xs
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
+
+--hilfsfunktion für fehlermeldungen
+show2 :: Definition -> String
+show2 (Definition (Variable a : _)_) = a
 
 program :: Parser Program
 program xs1 = do
@@ -133,9 +136,9 @@ program xs1 = do
         Semicolon : xs3 -> do
             (es, xs4) <- restProgram xs3
             case xs4 of
-                [] -> return (Program (e:es), xs4)
-                _  -> Nothing     -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
-        _               -> Nothing
+                []    -> return (Program (e:es), xs4)
+                (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
+        _               -> Left ("Semicolon expected after definition " ++ show2 e)
 
 restProgram :: Parser [Definition]
 restProgram xs1 = do
@@ -146,7 +149,7 @@ restProgram xs1 = do
                 Semicolon : xs3 -> do
                     (es, xs4) <- restProgram xs3
                     return (e:es, xs4)
-                _               -> Nothing
+                _               -> Left ("Semicolon expected after definition " ++ show2 e)
         _          -> return ([], xs1)
 
 def :: Parser Definition
@@ -161,7 +164,7 @@ restDef (Name i : xs1) = do
     (is, xs2) <- restDef xs1
     return (Variable i:is, xs2)
 restDef (Equals : xs1) = return ([], xs1)
-restDef _              = Nothing
+restDef (x:_)          = Left ("Expected: '=', Actual: " ++ show x)
 
 locDefs :: Parser LocDefs
 locDefs xs1 = do
@@ -183,7 +186,7 @@ locDef xs1 = do
         Equals : xs3 -> do
             (es, xs4) <- expr xs3
             return (LocDef e es, xs4)
-        _            -> Nothing
+        (x:_)        -> Left ("Expected: '=', Actual: " ++ show x)
 
 ex4 = program [Name "main", Equals, Number 1, Plus, Number 2, Semicolon]
 ex5 = locDef [Name "x", Equals, Not, Boolean True]
@@ -198,7 +201,7 @@ expr (Let : xs1) = do
         In : xs3 -> do
             (es, xs4) <- expr xs3
             return (LetX e es, xs4)
-        _        -> Nothing
+        (x:_)    -> Left ("Expected: 'in', Actual: " ++ show x)
 expr (If : xs1)  = do
     (e1, xs2) <- expr xs1
     case xs2 of
@@ -208,8 +211,8 @@ expr (If : xs1)  = do
                 Else : xs5 -> do
                     (es, xs6) <- expr xs5
                     return (IfX e1 e2 es, xs6)
-                _          -> Nothing
-        _          -> Nothing
+                (x:_)      -> Left ("Expected: 'else', Actual: " ++ show x)
+        (x:_)      -> Left ("Expected: 'then', Actual: " ++ show x)
 expr xs          = orExpr xs
 
 orExpr :: Parser Expression
@@ -258,54 +261,41 @@ ex8 = expr [Number 2, LessThan, Number 3, LessThan, Number 4] --hier wird Code n
 addExpr :: Parser Expression
 addExpr xs1 = do
     (e, xs2)  <- multExpr xs1
-    case xs2 of 
-        Minus : xs3 -> do
-            (es, xs4) <- multExpr2 xs3      -- damit 5--2 nicht geht
-            return (Diff e es, xs4)
-        Plus :  _   -> do
-            (es, xs3) <- restAddExpr xs2
-            return (foldl Sum e es, xs3)
-        _           -> return (e, xs2)
-
+    (es, xs3) <- restAddExpr xs2
+    return (foldl Sum e es, xs3)
+    
 restAddExpr :: Parser [Expression]
 restAddExpr (Plus : xs1)  = do
     (e, xs2)  <- multExpr2 xs1              -- damit 5+-2 nicht geht
     (es, xs3) <- restAddExpr xs2
     return (e:es, xs3)
--- restAddExpr (Minus : xs1) = do -- würde ermöglichen: a + b - c, diese eingaben sind aber nicht erlaubt da + und - dieselbe Präzedenz haben
---     (e, xs1) <-  multExpr xs1
---     return ([Neg e], xs1)
+restAddExpr (Minus : xs1) = do
+    (e, xs2)  <- multExpr2 xs1
+    (es, xs3) <- restAddExpr xs2
+    return (Neg e:es, xs3)
 restAddExpr xs            = return ([], xs)
 
 multExpr :: Parser Expression
 multExpr xs1 = do
     (e, xs2)  <- negExpr xs1
-    case xs2 of 
-        DivBy : xs3 -> do
-            (es, xs4) <- atomicExpr xs3     -- negExpr übersprungen, damit 5/-2 nicht geht
-            return (Div e es, xs4)
-        Times : _   -> do
-            (es, xs3) <- restMultExpr xs2
-            return (foldl Mult e es, xs3)
-        _           -> return (e, xs2)
+    (es, xs3) <- restMultExpr xs2
+    return (foldl Mult e es, xs3)
 
 multExpr2 :: Parser Expression              -- falls keine Negation möglich sein soll, zB (5--3) ist doof
 multExpr2 xs1 = do
     (e, xs2)  <- atomicExpr xs1
-    case xs2 of 
-        DivBy : xs3 -> do
-            (es, xs4) <- atomicExpr xs3
-            return (Div e es, xs4)
-        Times : _   -> do
-            (es, xs3) <- restMultExpr xs2
-            return (foldl Mult e es, xs3)
-        _           -> return (e, xs2)
+    (es, xs3) <- restMultExpr xs2
+    return (foldl Mult e es, xs3)-- case xs2 of 
 
 restMultExpr :: Parser [Expression]
 restMultExpr (Times : xs1) = do
     (e, xs2)  <- atomicExpr xs1             -- damit 5--2 nicht geht
     (es, xs3) <- restMultExpr xs2
     return (e:es, xs3)
+restMultExpr (DivBy : xs1) = do
+    (e, xs2)  <- atomicExpr xs1
+    (es, xs3) <- restMultExpr xs2
+    return (NegExpo e:es, xs3)
 restMultExpr xs            = return ([], xs)
 
 negExpr :: Parser Expression
@@ -327,11 +317,11 @@ atomicExpr (OpenPar : xs1)   = do
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
             return (foldl Function e es, xs4)
-        _              -> Nothing
+        (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
 atomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (foldl Function (Variable i) is, xs2)
-atomicExpr _                 = Nothing
+atomicExpr (x:_)             = Left ("Expected: number, boolean or variable, Actual: " ++ show x)
 
 restAtomicExpr :: Parser [Expression]
 restAtomicExpr (Number i : xs1)  = do
@@ -346,7 +336,7 @@ restAtomicExpr (OpenPar : xs1)   = do
         ClosePar : xs3 -> do
             (es, xs4) <- restAtomicExpr xs3
             return (e:es, xs4)
-        _              -> Nothing
+        (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
 restAtomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (Variable i:is, xs2)
@@ -354,10 +344,18 @@ restAtomicExpr xs                = return ([], xs)
 
 variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
-variable _             = Nothing
+variable (x:_)         = Left ("Expected: variable, Actual: " ++ show x)
 
 tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
 ex9 = addExpr [Number 5, Plus, Minus, Number 2] -- erklärung multexpr 2
-ex10 = addExpr [Number 1 , Plus, Number 2, Minus, Number 3, Minus, Number 5] -- 3-2+1= 0 / 2
-ex11 = addExpr [Number 1 , Minus, Number 2, Minus, Number 3]
+ex10 = addExpr [Number 1 , Plus, Number 2, Minus, Number 3, Minus, Number 1] --1+2-3
+ex11 = addExpr [Number 1 , Plus, Number 2, Plus, Number 3]
+ex12 = tokUndPar "f x = 5*x+4;"
+ex13 = tokUndPar "f x = 5*x+4 & True | 3 < 6;"
+ex14 = addExpr [OpenPar, Number 1 , Plus, Number 2, ClosePar, Minus, Number 3] --1+2-3
+
+ex15 = tokUndPar "f = 3-2-1;"
+ex16 = tokUndPar "f = 3*2/1;"
+
+--  x = -5; --> x = +(-5)
