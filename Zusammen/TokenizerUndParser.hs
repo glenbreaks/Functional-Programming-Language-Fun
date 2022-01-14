@@ -65,7 +65,7 @@ type Parser a = [Token] -> Maybe (a, [Token])
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
 spaceyfier :: String -> String
-spaceyfier x = do
+spaceyfier x = 
    case x of
        ';' : xs       -> " ;"   ++ spaceyfier xs        -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
        '|' : xs       -> " | "  ++ spaceyfier xs
@@ -101,13 +101,13 @@ tokenizer ("then"  : xs) = Then          : tokenizer xs
 tokenizer ("else"  : xs) = Else          : tokenizer xs
 tokenizer (";"     : xs) = Semicolon     : tokenizer xs
 tokenizer ("="     : xs) = Equals        : tokenizer xs
-tokenizer ("True"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
+tokenizer ("True"  : xs) = Boolean True  : tokenizer xs 
 tokenizer ("False" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
 tokenizer (x:xs)
     | checkNumber x                   = Number (read x) : tokenizer xs
     | isAlpha (head x) && checkName x = Name x          : tokenizer xs
-    | otherwise                       = throw (InvalidName x)
+    | otherwise                       = throw (InvalidName x) 
 
 checkNumber :: String -> Bool
 checkNumber (x:xs) = isDigit x && checkNumber xs
@@ -117,11 +117,11 @@ checkName :: String -> Bool
 checkName (x:xs) = (isAlphaNum x || x == '_' || x == '\'') && checkName xs
 checkName []     = True
 
-ex1 = tokenizer ["main", "=", "foo", "x", "y", "=", "2", "*", "x", "+", "y", ";"]
-ex2 = tokenizer $ words $ spaceyfier "f a b c = 2*a + 3*x /4;"
-ex3 = tokenizer ["f", ";x", "23", ";"] -- False (Exception: InvalidName)
+tokenize xs = tokenizer $ words $ spaceyfier xs
 
--- tokenizer $ words $ spaceyfier xs
+ex1 = tokenizer ["main", "=", "foo", "x", "y", "=", "2", "*", "x", "+", "y", ";"]
+ex2 = tokenize "f a b c = 2*a + 3*x/4;"
+ex3 = tokenizer ["f", ";x", "23", ";"] -- False (Exception: InvalidName)
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
