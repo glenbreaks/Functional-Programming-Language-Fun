@@ -54,8 +54,6 @@ data Expression
 newtype Program = Program [Definition] deriving Show
 
 data Definition = Definition [Expression] Expression deriving Show
--- instance Show Definition
---     where show (Definition (Variable a : _)_) = a
 
 newtype LocDefs = LocDefs [LocDef] deriving Show
 
