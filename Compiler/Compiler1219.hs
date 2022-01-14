@@ -94,7 +94,13 @@ data State = State
         stack  :: Stack,
         heap   :: Heap,
         global :: Global
-    } deriving Show
+    } -- deriving Show
+
+instance Show State where show (State _ code _ _ _)= showCode code
+                            where
+                                showCode (x:xs) = show x ++ "\n" ++ showCode xs
+                                showCode []     = []
+
 
 type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
 type Heap   = [HeapCell]
