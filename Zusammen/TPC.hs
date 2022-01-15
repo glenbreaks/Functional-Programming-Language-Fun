@@ -506,8 +506,13 @@ posifyerLet xs = pos xs n
 
 ---------- combining functions
 parse xs = program $ tokenize xs
-compile2 (Right (Program xs, [])) = compileProgram xs
-compile xs = compile2 $ parse xs
+-- compile2 (Right (Program xs, [])) = compileProgram xs
+
+compile :: String -> Either String State
+compile xs = 
+    case parse xs of
+        (Right (Program xs, [])) -> return (compileProgram xs)
+        Left string              -> Left string
 
 ---------- test examples
 
