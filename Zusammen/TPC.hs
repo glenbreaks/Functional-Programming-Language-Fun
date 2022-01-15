@@ -196,7 +196,7 @@ program xs1 = do
             case xs4 of
                 []    -> return (Program (e:es), xs4)
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
-        _               -> Left ("Semicolon expected after definition " ++ show2 e)
+        x               -> Left ("Parser error on input: " ++ show x)
 
 restProgram :: Parser [Definition]
 restProgram xs1 = do
@@ -478,6 +478,16 @@ compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) 0 ++ 
 --         paramizer []          = []
 --         -- paramizer packt die Parameter aus der liste pos wieder aus und in die Instruction Pushparam
 
+-- getOp :: Expression -> Token
+-- getOp x =
+--     case x of
+--         LessThanX a b   -> LessThan
+--         IsX       a b   -> Is
+--         Sum       a b   -> Plus
+--         Mult      a b   -> Times
+--         NotX      a     -> Not
+--         Neg       a     -> Minus
+--         NegExpo   a     -> DivBy
 
 compileExpr :: Expression -> [(Expression, Int)] -> Int -> [Instruction]
 -- compileExpr x ((u,v):xs) = 
@@ -488,40 +498,53 @@ compileExpr :: Expression -> [(Expression, Int)] -> Int -> [Instruction]
 
 -- Idee: nur 3 comileExpr nach arity geordnet, patternmatching mit
 -- compileExpr (Expression a b) env i = ... ++ [Pushpre getOp Expression, ...]
--- getOp :: Expression -> Token
 
-compileExpr (LetX      (LocDefs a) b)   env i = compileLocDefs a env i ++ compileExpr b env (i+n) ++ [Slidelet n]
-    where n = length a -- Anzahl der Lokaldefinitionen
+
+compileExpr (LetX      (LocDefs a) b)   env i = compileLocDefs a envLet (i-1) ++ compileExpr b envLet (i-1) ++ [Slidelet n]
+    where                                                               -- hier i? checken durch lokaldefinitionen mit parametern!
+        n = length a -- Anzahl der Lokaldefinitionen
+        envLet = posifyerLet a
 
 compileExpr (IfX                a  b c) env i = compileExpr c env i ++ compileExpr b env (i+1) ++ compileExpr a env 2 ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
 
 compileExpr (NotX               a)      env i = compileExpr a env i ++ [Pushpre Not, Makeapp]
 compileExpr (Neg                a)      env i = compileExpr a env i ++ [Pushpre Minus, Makeapp]
+compileExpr (NegExpo            a)      env i = compileExpr a env i ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
 
-compileExpr (OrX                a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Or, Makeapp, Makeapp]
-compileExpr (AndX               a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre And, Makeapp, Makeapp]
-compileExpr (LessThanX          a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre LessThan, Makeapp, Makeapp]
-compileExpr (IsX                a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Is, Makeapp, Makeapp]
-compileExpr (Sum                a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Plus, Makeapp, Makeapp]
-compileExpr (Mult               a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Times, Makeapp, Makeapp]
+-- compileExpr (OrX                a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Or, Makeapp, Makeapp]
+compileExpr (OrX                a  b)   env i = compileExpr (IfX a (BoolVal True) b)  env i
+compileExpr (AndX               a  b)   env i = compileExpr (IfX a b (BoolVal False)) env i 
+
+compileExpr (LessThanX          a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre LessThan, Makeapp, Makeapp]
+compileExpr (IsX                a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Is, Makeapp, Makeapp]
+compileExpr (Sum                a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Plus, Makeapp, Makeapp]
+compileExpr (Mult               a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Times, Makeapp, Makeapp]
 
 compileExpr (Function (Variable a) b)   env i = compileExpr b env i ++ [Pushfun a, Makeapp]
 compileExpr (Val                a)      env i = [Pushval Int a]
 compileExpr (BoolVal            a)      env i = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
-            | otherwise = throw (TypeCheck ("Expected: Bool, Actual: " ++ show a))
+            -- | otherwise = throw (TypeCheck ("Expected: Bool, Actual: " ++ show a))
 compileExpr (Variable           a)      env i = [Pushparam (pos (Variable a) env + i)]
 
 compileLocDefs :: [LocDef] -> [(Expression, Int)] -> Int -> [Instruction]
-compileLocDefs x env i = alloc n ++ cLocDefs x env i n m
+compileLocDefs x env i = alloc n ++ cLocDefs x env i n
     where
         n = length x -- Anzahl der Lokaldefinitionen
         m = length x
         alloc 0 = []
         alloc x = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
-        cLocDefs ((LocDef var expr):xs) env i n m = compileExpr expr env m ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1) m
-        cLocDefs []                     _   _ _ _ = []
+        cLocDefs ((LocDef var expr):xs) env i n = compileExpr expr env i ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1)
+        cLocDefs []                     _   _ _ = []
+
+posifyerLet :: [LocDef] -> [(Expression, Int)]
+posifyerLet xs = pos xs n
+    where 
+        n = length xs
+        pos ((LocDef var _):xs) n = (var, n-1) : pos xs (n-1)
+        pos []                  n = []
+
 
 -- compileLocDef :: LocDef -> [(Expression, Int)] -> Int -> [Instruction]
 -- compileLocDef (LocDef(Variable a) expr) env i = [Alloc, Alloc, Makeapp] ++ compileExpr expr env i ++ [Alloc, Alloc, Makeapp]
@@ -546,4 +569,15 @@ ex10 = compileProgram [Definition [Variable "main"] (Function (Variable "f") (Va
 
 ex11 = compile "main = f 5; f x = 2 + x;" -- passt
 ex12 = compile "main = f 5; f x = 2 * x;" -- passt
-ex13 = compile "main = f 5; f x = 2 - x;"
+ex13 = compile "main = f 5; f x = 2 - x;" -- passt
+ex14 = compile "main = f 5; f x = 2 / x;" -- passt
+ex15 = compile "main = f 5; f x = 2 * x + 1;" -- passt
+ex16 = compile "main = f 5; f x = 2 / x - 1;" -- passt
+ex17 = compile "main = f 5; f x = 2 < 1;" -- passt
+ex18 = compile "main = f 5; f x = 2 == 1;" -- passt
+ex19 = compile "main = f 5; f x = 2 | 1;" -- passt
+ex20 = compile "main = 2 & 1;" -- passt
+ex21 = compile "main = let x = 1; y = z; z = 2 in x + y;" -- passt
+ex22 = compile "main = let v1 = v2; v2 = 9 in v1;" --passt
+ex23 = compile "main = let x = y; y = z; z= 1/5 in x;" -- passt
+ex24 = compile "main = let y = x*x; x = 3 in y + 1;" -- passt
