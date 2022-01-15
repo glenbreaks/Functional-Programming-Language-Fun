@@ -63,8 +63,10 @@ type Parser a = [Token] -> Either String (a, [Token])
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
+tokenize xs = tokenizer $ words $ spaceyfier xs
+
 spaceyfier :: String -> String
-spaceyfier x = do
+spaceyfier x =
    case x of
        ';' : xs       -> " ;"   ++ spaceyfier xs        -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
        '|' : xs       -> " | "  ++ spaceyfier xs
@@ -165,6 +167,7 @@ restDef (Name i : xs1) = do
     return (Variable i:is, xs2)
 restDef (Equals : xs1) = return ([], xs1)
 restDef (x:_)          = Left ("Expected: '=', Actual: " ++ show x)
+restDef []             = Left "Definition incomplete"
 
 locDefs :: Parser LocDefs
 locDefs xs1 = do
@@ -187,6 +190,7 @@ locDef xs1 = do
             (es, xs4) <- expr xs3
             return (LocDef e es, xs4)
         (x:_)        -> Left ("Expected: '=', Actual: " ++ show x)
+        []           -> Left "Local definition incomplete"
 
 ex4 = program [Name "main", Equals, Number 1, Plus, Number 2, Semicolon]
 ex5 = locDef [Name "x", Equals, Not, Boolean True]
@@ -202,6 +206,7 @@ expr (Let : xs1) = do
             (es, xs4) <- expr xs3
             return (LetX e es, xs4)
         (x:_)    -> Left ("Expected: 'in', Actual: " ++ show x)
+        []       -> Left "Expected 'in' after local definition"
 expr (If : xs1)  = do
     (e1, xs2) <- expr xs1
     case xs2 of
@@ -212,7 +217,9 @@ expr (If : xs1)  = do
                     (es, xs6) <- expr xs5
                     return (IfX e1 e2 es, xs6)
                 (x:_)      -> Left ("Expected: 'else', Actual: " ++ show x)
+                []         -> Left "Expected 'else' after 'then' block"
         (x:_)      -> Left ("Expected: 'then', Actual: " ++ show x)
+        []         -> Left "Expected 'then' after 'if' block"
 expr xs          = orExpr xs
 
 orExpr :: Parser Expression
@@ -318,10 +325,12 @@ atomicExpr (OpenPar : xs1)   = do
             (es, xs4) <- restAtomicExpr xs3
             return (foldl Function e es, xs4)
         (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
+        []             -> Left "Missing ')'"
 atomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (foldl Function (Variable i) is, xs2)
 atomicExpr (x:_)             = Left ("Expected: number, boolean or variable, Actual: " ++ show x)
+atomicExpr []                = Left "Expected: number, boolean or variable"
 
 restAtomicExpr :: Parser [Expression]
 restAtomicExpr (Number i : xs1)  = do
@@ -337,6 +346,7 @@ restAtomicExpr (OpenPar : xs1)   = do
             (es, xs4) <- restAtomicExpr xs3
             return (e:es, xs4)
         (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
+        []             -> Left "Missing ')'"
 restAtomicExpr (Name i : xs1)    = do
     (is, xs2) <- restAtomicExpr xs1
     return (Variable i:is, xs2)
@@ -345,6 +355,7 @@ restAtomicExpr xs                = return ([], xs)
 variable :: Parser Expression
 variable (Name i : xs) = return (Variable i, xs)
 variable (x:_)         = Left ("Expected: variable, Actual: " ++ show x)
+variable []            = Left "Expected: variable"
 
 tokUndPar xs = program $ tokenizer $ words $ spaceyfier xs
 
