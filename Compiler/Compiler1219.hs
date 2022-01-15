@@ -11,7 +11,7 @@ data CompilerException
 instance Exception CompilerException
 
 data Token
-    = Number Integer
+    = Number Int
     | Name String
     | Boolean Bool
     | Or
@@ -48,7 +48,7 @@ data Expression
     | Mult      Expression Expression
     | Neg       Expression
     | Function  Expression Expression
-    | Val       Integer
+    | Val       Int
     | BoolVal   Bool
     | Variable  String
     deriving (Eq, Show)
@@ -84,8 +84,8 @@ data Instruction
     | Slidelet Int
     deriving Show
 
-data Type  = Num | Bool deriving Show  -- 1 = Bool, 0 = Zahl
-type Value = Integer    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
+data Type  = Int | Bool deriving Show  -- 1 = Bool, 0 = Zahl
+type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 
 data State = State
     {
@@ -96,10 +96,11 @@ data State = State
         global :: Global
     } -- deriving Show
 
-instance Show State where show (State _ code _ _ _)= showCode code
-                            where
-                                showCode (x:xs) = show x ++ "\n" ++ showCode xs
-                                showCode []     = []
+instance Show State
+    where show (State _ code _ _ _)= showCode code
+            where
+                showCode (x:xs) = show x ++ "\n" ++ showCode xs
+                showCode []     = []
 
 
 type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
@@ -152,7 +153,7 @@ posifyer xs = pos xs 1
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
--- pos :: Expression -> [(Expression, Int)] -> Int -- liefert i nur, wenn x im ersten Tupel ist
+-- pos :: Expression -> [(Expression, Int)] -> Int -- liefert i nur, wenn s im ersten Tupel ist
 -- pos s ((x, i):_) = 
 --     if s == x then i else 0
 
@@ -180,6 +181,7 @@ compileDef :: Definition -> [Instruction]
 compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) 0 ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
         n = length args   
+-- warum nirgends Pushfun fun?? geht die Information über den Namen verloren? aber output passt hää
 
 -- let n   = length args     -- Stelligkeit von fun
 -- let a   = length args + 1 -- Länge des Anwendungsgraphen
@@ -223,7 +225,7 @@ compileExpr (Sum                a  b)   env i = compileExpr b env i ++ compileEx
 compileExpr (Mult               a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Times, Makeapp, Makeapp]
 
 compileExpr (Function (Variable a) b)   env i = compileExpr b env i ++ [Pushfun a, Makeapp]
-compileExpr (Val                a)      env i = [Pushval Num a]
+compileExpr (Val                a)      env i = [Pushval Int a]
 compileExpr (BoolVal            a)      env i = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
