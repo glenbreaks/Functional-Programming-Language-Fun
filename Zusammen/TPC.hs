@@ -404,9 +404,7 @@ variable (Name i : xs) = return (Variable i, xs)
 variable (x:_)         = Left ("Expected: variable, Actual: " ++ show x)
 variable []            = Left "Expected: variable"
 
---  x = -5; --> x = +(-5)import Control.Exception (Exception, throw)
-
--- data Operators --stattdessen einfach token wiederverwenden?
+-- data Operators -- using this instead of token in Pushpre Token?
 --     = If
 --     | Or
 --     | And
@@ -417,28 +415,16 @@ variable []            = Left "Expected: variable"
 --     | Times
 --     | DivBy
 --     | Not
---     deriving (Eq, Show) -- Token?
+--     deriving (Eq, Show)
 
--- Nebenfunktionen:
-
--- arity :: Expression -> Op 
--- arity (NotX x)    = UnaryOp 
--- arity (Neg x)     = UnaryOp 
--- arity (IfX x y z) = IfOp
--- arity  _          = BinaryOp
- 
 posifyer :: [Expression] -> [(Expression, Int)]
 posifyer xs = pos xs 1
     where 
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
--- pos :: Expression -> [(Expression, Int)] -> Int -- liefert i nur, wenn s im ersten Tupel ist
--- pos s ((x, i):_) = 
---     if s == x then i else 0
-
-pos :: Expression -> [(Expression, Int)] -> Int -- durchsucht die ganze Liste nach s
-pos (Variable s) []           = 0 --throw (VariableNotInScope s)
+pos :: Expression -> [(Expression, Int)] -> Int
+pos (Variable s) []           = throw (VariableNotInScope s)
 pos s ((x, i):xs) | s == x    = i
                   | otherwise = pos s xs
 
@@ -449,7 +435,7 @@ compileProgram (x:xs) = State 0 (compileMain x ++ cProg xs) [] [] []
     where             --pc---------code-----------------stack-heap-global
         cProg (x:xs) = compileDef x ++ cProg xs
         cProg []     = []
--- HeapCells hier aufbauen ?
+-- build HeapCells here or in emulator?
 
 compileMain :: Definition -> [Instruction]
 compileMain (Definition [Variable "main"] body) = [Reset, Pushfun "main", Call, Halt, Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return, --BinärOp
@@ -462,21 +448,6 @@ compileDef :: Definition -> [Instruction]
 compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) 0 ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
         n = length args   
--- warum nirgends Pushfun fun?? geht die Information über den Namen verloren? aber output passt hää
-
--- let n   = length args     -- Stelligkeit von fun
--- let a   = length args + 1 -- Länge des Anwendungsgraphen
--- code = code ++ L:ÜbDef(Expr, posifyer xs, n)
--- heap = heap ++ DEF f n L
--- global = global ++ (f, addr DEF f)
-
--- compileLocDef :: Expression -> Expression -> [Instruction]
--- compileFun :: [Expression] -> [Instruction]
--- compileFun (Variable f:args) = Pushfun f : paramizer (posifyer args)
---     where
---         paramizer ((x, y):xs) = Pushparam y : paramizer xs
---         paramizer []          = []
---         -- paramizer packt die Parameter aus der liste pos wieder aus und in die Instruction Pushparam
 
 -- getOp :: Expression -> Token
 -- getOp x =
@@ -490,16 +461,6 @@ compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) 0 ++ 
 --         NegExpo   a     -> DivBy
 
 compileExpr :: Expression -> [(Expression, Int)] -> Int -> [Instruction]
--- compileExpr x ((u,v):xs) = 
-    -- case arity x of 
-    --     UnaryOp  -> [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]
-    --     BinaryOp -> [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return]
-    --     IfOp     -> [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Return]
-
--- Idee: nur 3 comileExpr nach arity geordnet, patternmatching mit
--- compileExpr (Expression a b) env i = ... ++ [Pushpre getOp Expression, ...]
-
-
 compileExpr (LetX      (LocDefs a) b)   env i = compileLocDefs a envLet (i-1) ++ compileExpr b envLet (i-1) ++ [Slidelet n]
     where                                                               -- hier i? checken durch lokaldefinitionen mit parametern!
         n = length a -- Anzahl der Lokaldefinitionen
@@ -525,14 +486,12 @@ compileExpr (Val                a)      env i = [Pushval Int a]
 compileExpr (BoolVal            a)      env i = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
-            -- | otherwise = throw (TypeCheck ("Expected: Bool, Actual: " ++ show a))
 compileExpr (Variable           a)      env i = [Pushparam (pos (Variable a) env + i)]
 
 compileLocDefs :: [LocDef] -> [(Expression, Int)] -> Int -> [Instruction]
 compileLocDefs x env i = alloc n ++ cLocDefs x env i n
     where
         n = length x -- Anzahl der Lokaldefinitionen
-        m = length x
         alloc 0 = []
         alloc x = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
         cLocDefs ((LocDef var expr):xs) env i n = compileExpr expr env i ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1)
@@ -545,22 +504,18 @@ posifyerLet xs = pos xs n
         pos ((LocDef var _):xs) n = (var, n-1) : pos xs (n-1)
         pos []                  n = []
 
-
--- compileLocDef :: LocDef -> [(Expression, Int)] -> Int -> [Instruction]
--- compileLocDef (LocDef(Variable a) expr) env i = [Alloc, Alloc, Makeapp] ++ compileExpr expr env i ++ [Alloc, Alloc, Makeapp]
-
-----------
+---------- combining functions
 parse xs = program $ tokenize xs
 compile2 (Right (Program xs, [])) = compileProgram xs
 compile xs = compile2 $ parse xs
 
--- ex1 = compileFun [Variable "x", Variable "y"]
+---------- test examples
+
 ex2 = posifyer [Variable "x", Variable "y"]
 ex3 = pos (Variable "x") ex2
 ex4 = pos (Variable "q") ex2
 ex5 = compileProgram [Definition [Variable "main"] (Function (Variable "f") (Val 5)),Definition [Variable "f",Variable "x"] (Mult (Val 3) (Variable "x"))]
 skriptex = compileProgram [Definition [Variable "main"] (Function (Variable "quadrat") (Function (Variable "quadrat") (Mult (Val 3) (Val 1)))),Definition [Variable "quadrat",Variable "x"] (Mult (Variable "x") (Variable "x"))]
-
 ex6 = compileProgram [Definition [Variable "main"] (Function (Variable "f") (Val 5)),Definition [Variable "f",Variable "x"] (Sum (Val 3) (Variable "x"))]
 ex7 = compileProgram [Definition [Variable "main"] (Function (Variable "f") (Val 5)),Definition [Variable "f",Variable "x"] (IfX (LessThanX (Variable "x") (Val 3)) (BoolVal True) (BoolVal False))]
 ex8 = compileProgram [Definition [Variable "main"] (Function (Variable "f") (Val 5)),Definition [Variable "f",Variable "x"] (LetX (LocDefs [LocDef (Variable "y") (Val 2)]) (Variable "x"))] -- klappt
