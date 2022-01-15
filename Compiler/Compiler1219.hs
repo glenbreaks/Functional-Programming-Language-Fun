@@ -42,9 +42,8 @@ data Expression
     | NotX      Expression
     | LessThanX Expression Expression
     | IsX       Expression Expression
-    | Diff      Expression Expression
     | Sum       Expression Expression
-    | Div       Expression Expression
+    | NegExpo   Expression -- x hoch minus 1 = 1/x
     | Mult      Expression Expression
     | Neg       Expression
     | Function  Expression Expression
@@ -153,19 +152,20 @@ posifyer xs = pos xs 1
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
--- pos :: Expression -> [(Expression, Int)] -> Int -- liefert i nur, wenn s im ersten Tupel ist
--- pos s ((x, i):_) = 
---     if s == x then i else 0
+pos :: Expression -> [(Expression, Int)] -> Int -- liefert i nur, wenn s im ersten Tupel ist
+pos s ((x, i):_) = 
+    if s == x then i else 
 
-pos :: Expression -> [(Expression, Int)] -> Int -- durchsucht die ganze Liste nach x
-pos (Variable s) []           = 0 --throw (VariableNotInScope s)
-pos s ((x, i):xs) | s == x    = i
-                  | otherwise = pos s xs
+-- pos :: Expression -> [(Expression, Int)] -> Int -- durchsucht die ganze Liste nach s
+-- pos (Variable s) []           = 0 --throw (VariableNotInScope s)
+-- pos s ((x, i):xs) | s == x    = i
+--                   | otherwise = pos s xs
+
 ---------- compileFunktionen:
 
 compileProgram :: [Definition] -> State
 compileProgram (x:xs) = State 0 (compileMain x ++ cProg xs) [] [] []
-    where             --pc---------code-----------stack-heap-global
+    where             --pc---------code-----------------stack-heap-global
         cProg (x:xs) = compileDef x ++ cProg xs
         cProg []     = []
 -- HeapCells hier aufbauen ?
@@ -233,13 +233,14 @@ compileExpr (BoolVal            a)      env i = [Pushval Bool x] -- x ist 0 oder
 compileExpr (Variable           a)      env i = [Pushparam (pos (Variable a) env + i)]
 
 compileLocDefs :: [LocDef] -> [(Expression, Int)] -> Int -> [Instruction]
-compileLocDefs x env i = alloc n ++ cLocDefs x env i n
+compileLocDefs x env i = alloc n ++ cLocDefs x env i n m
     where
         n = length x -- Anzahl der Lokaldefinitionen
+        m = length x
         alloc 0 = []
         alloc x = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
-        cLocDefs ((LocDef var expr):xs) env i n = compileExpr expr env (i+n) ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1)
-        cLocDefs []                     _   _ _ = []
+        cLocDefs ((LocDef var expr):xs) env i n m = compileExpr expr env m ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1) m
+        cLocDefs []                     _   _ _ _ = []
 
 -- compileLocDef :: LocDef -> [(Expression, Int)] -> Int -> [Instruction]
 -- compileLocDef (LocDef(Variable a) expr) env i = [Alloc, Alloc, Makeapp] ++ compileExpr expr env i ++ [Alloc, Alloc, Makeapp]
