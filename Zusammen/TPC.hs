@@ -85,6 +85,9 @@ data Instruction
 instance Show Instruction
     where show Reset              = "Reset"
           show (Pushfun fun)      = "Pushfun " ++ fun
+          show (Pushval Bool v)
+                      | v == 0    = "Pushval Bool False"
+                      | otherwise = "Pushval Bool True"
           show (Pushval t v)      = "Pushval " ++ show t ++ " " ++ show v
           show (Pushparam i)      = "Pushparam " ++ show i
           show Makeapp            = "Makeapp"
@@ -93,6 +96,7 @@ instance Show Instruction
           show Halt               = "Halt"
           show Unwind             = "Unwind"
           show Call               = "Call"
+          show (Pushpre If)       = "Pushpre if"
           show (Pushpre Plus)     = "Pushpre +"
           show (Pushpre Minus)    = "Pushpre -"
           show (Pushpre Times)    = "Pushpre *"
@@ -123,16 +127,16 @@ data State = State
     } -- deriving Show
 
 instance Show State
-    where show (State _ code _ heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 1
+    where show (State _ code _ heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
                                               ++ "\n········\n: Heap :\n········\n"                        ++ showHeap heap 
                                               ++ "\n\n··········\n: Global :\n··········\n"                ++ showGlobal global ++ "\n"
             where
-                showCode (x:xs) 5             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 6
-                showCode (x:xs) 14            = "\n· if operation ·\nc14:  "     ++ show x ++ "\n" ++ showCode xs 15
-                showCode (x:xs) 22            = "\n· unary operation ·\nc22:  "  ++ show x ++ "\n" ++ showCode xs 23
+                showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
+                showCode (x:xs) 13            = "\n· if operation ·\nc14:  "     ++ show x ++ "\n" ++ showCode xs 14
+                showCode (x:xs) 21            = "\n· unary operation ·\nc22:  "  ++ show x ++ "\n" ++ showCode xs 22
                 showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
                 showCode (Return:xs) akk      
-                    | akk /= 13 && akk /=21   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name akk heap ++ " ·\n" ++ showCode xs (akk+1)
+                    | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
                 name n (x:xs)                 = if (\(DEF _ _ adr) -> adr) x == n then (\(DEF fun _ _) -> fun) x else name n xs
@@ -467,6 +471,7 @@ cFun x =
     case x of
         Val a      -> [Pushval Int a]
         Variable a -> [Pushfun a]
+        _          -> []
 
 
 ---------- compileFunktionen:
