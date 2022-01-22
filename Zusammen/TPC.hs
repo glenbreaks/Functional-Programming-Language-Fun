@@ -127,7 +127,7 @@ instance Show State
                                               ++ "\n········\n: Heap :\n········\n"                        ++ showHeap heap 
                                               ++ "\n\n··········\n: Global :\n··········\n"                ++ showGlobal global ++ "\n"
             where
-                showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
+                showCode (x:xs) 5             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 6
                 showCode (x:xs) 14            = "\n· if operation ·\nc14:  "     ++ show x ++ "\n" ++ showCode xs 15
                 showCode (x:xs) 22            = "\n· unary operation ·\nc22:  "  ++ show x ++ "\n" ++ showCode xs 23
                 showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
