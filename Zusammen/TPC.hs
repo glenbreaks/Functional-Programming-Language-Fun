@@ -75,15 +75,41 @@ data Instruction
     | Unwind
     | Call
     | Pushpre Token --vorher Op
-    -- | Update Arg
     | Updatefun Int
     | Updateop
     | Operator Op
     | Alloc -- ab hier extra für Let, siehe Zhus Skript S. 25
     | Updatelet Int
     | Slidelet Int
-    deriving Show
+    
+instance Show Instruction
+    where show Reset              = "Reset"
+          show (Pushfun fun)      = "Pushfun " ++ fun
+          show (Pushval t v)      = "Pushval " ++ show t ++ " " ++ show v
+          show (Pushparam i)      = "Pushparam " ++ show i
+          show Makeapp            = "Makeapp"
+          show (Slide i)          = "Slide " ++ show i
+          show Return             = "Return"
+          show Halt               = "Halt"
+          show Unwind             = "Unwind"
+          show Call               = "Call"
+          show (Pushpre Plus)     = "Pushpre +"
+          show (Pushpre Minus)    = "Pushpre -"
+          show (Pushpre Times)    = "Pushpre *"
+          show (Pushpre DivBy)    = "Pushpre 1/"
+          show (Pushpre Or)       = "Pushpre |"
+          show (Pushpre And)      = "Pushpre &"
+          show (Pushpre Not)      = "Pushpre not"
+          show (Pushpre LessThan) = "Pushpre <"
+          show (Pushpre Is)       = "Pushpre =="
+          show (Updatefun i)      = "Update " ++ show i
+          show Updateop           = "Update op"
+          show (Operator o)       = "Operator " ++ show o
+          show Alloc              = "Alloc"
+          show (Updatelet i)      = "Updatelet " ++ show i
+          show (Slidelet i)       = "Slidelet " ++ show i
 
+          
 data Type  = Int | Bool deriving Show  -- 1 = Bool, 0 = Zahl
 type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 
@@ -97,19 +123,34 @@ data State = State
     } -- deriving Show
 
 instance Show State
-    where show (State _ code _ _ _)= showCode code
+    where show (State _ code _ heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 1
+                                              ++ "\n········\n: Heap :\n········\n"                        ++ showHeap heap 
+                                              ++ "\n\n··········\n: Global :\n··········\n"                ++ showGlobal global ++ "\n"
             where
-                showCode (x:xs) = show x ++ "\n" ++ showCode xs
-                showCode []     = []
-
-
+                showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
+                showCode (x:xs) 14            = "\n· if operation ·\nc14:  "     ++ show x ++ "\n" ++ showCode xs 15
+                showCode (x:xs) 22            = "\n· unary operation ·\nc22:  "  ++ show x ++ "\n" ++ showCode xs 23
+                showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
+                showCode (Return:xs) akk      
+                    | akk /= 13 && akk /=21   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name akk heap ++ " ·\n" ++ showCode xs (akk+1)
+                    | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
+                showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
+                name n (x:xs)                 = if (\(DEF _ _ adr) -> adr) x == n then (\(DEF fun _ _) -> fun) x else name n xs
+                name _ []                     = ""
+                showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
+                showHeap []                   = []
+                showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
+                showGlobal []                 = ""
+                indent 0                      = ""
+                indent n                      = " " ++ indent (n-1)
+    
 type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
 type Heap   = [HeapCell]
 type Global = [(String, Int)]
 
 data HeapCell 
-    = APP Int Int           -- Konstruktor für Knoten
-    | DEF String Int Int    -- DEF f N Code-Adr, f = Funktion, N = Stelligkeit
+    = APP HeapCell HeapCell -- Konstruktor für Knoten
+    | DEF String Int Int    -- DEF f N Code-Adr, f = Funktion, N = Stelligkeit -- HeapCell statt Int (IND?)
     | VAL Type Value        -- Blätter
     | IND Int               -- HeapAdress
     | PRE Op
@@ -119,7 +160,11 @@ data Op
     = UnaryOp
     | BinaryOp
     | IfOp
-    deriving Show
+
+instance Show Op
+    where show UnaryOp  = "1"
+          show BinaryOp = "2"
+          show IfOp     = "if"
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -185,7 +230,7 @@ checkName []     = True
 
 --hilfsfunktion für fehlermeldungen
 show2 :: Definition -> String
-show2 (Definition (Variable a : _)_) = a
+show2 (Definition (Variable a : _)_) = a -- brauchen wir das noch für die fehlermeldungen?
 
 program :: Parser Program
 program xs1 = do
@@ -196,7 +241,7 @@ program xs1 = do
             case xs4 of
                 []    -> return (Program (e:es), xs4)
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konne) -> Nothing 
-        x               -> Left ("Parser error on input: " ++ show x)
+        x               -> Left ("Expected: Semicolon, Actual: " ++ show x)
 
 restProgram :: Parser [Definition]
 restProgram xs1 = do
@@ -359,18 +404,18 @@ negExpr (Minus : xs1) = do
 negExpr xs            = atomicExpr xs
 
 atomicExpr :: Parser Expression
-atomicExpr (Number i : xs1)  = do
-    (is, xs2) <- restAtomicExpr xs1
-    return (foldl Function (Val i) is, xs2)
-atomicExpr (Boolean i : xs1) = do
-    (is, xs2) <- restAtomicExpr xs1
-    return (foldl Function (BoolVal i) is, xs2)
+atomicExpr (Number i : xs1)  = return (Val i, xs1) -- do
+    -- (is, xs2) <- restAtomicExpr xs1
+    -- return (foldl Function (Val i) is, xs2)
+atomicExpr (Boolean i : xs1) = return (BoolVal i, xs1) -- do
+    -- (is, xs2) <- restAtomicExpr xs1
+    -- return (foldl Function (BoolVal i) is, xs2)
 atomicExpr (OpenPar : xs1)   = do
     (e, xs2)  <- expr xs1
     case xs2 of
-        ClosePar : xs3 -> do
-            (es, xs4) <- restAtomicExpr xs3
-            return (foldl Function e es, xs4)
+        ClosePar : xs3 -> return (e, xs2) -- do
+            -- (es, xs4) <- restAtomicExpr xs3
+            -- return (foldl Function e es, xs4) -- ?
         (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
         []             -> Left "Missing ')'"
 atomicExpr (Name i : xs1)    = do
@@ -404,18 +449,7 @@ variable (Name i : xs) = return (Variable i, xs)
 variable (x:_)         = Left ("Expected: variable, Actual: " ++ show x)
 variable []            = Left "Expected: variable"
 
--- data Operators -- using this instead of token in Pushpre Token?
---     = If
---     | Or
---     | And
---     | LessThan
---     | Is
---     | Plus
---     | Minus
---     | Times
---     | DivBy
---     | Not
---     deriving (Eq, Show)
+---------- Compiler:
 
 posifyer :: [Expression] -> [(Expression, Int)]
 posifyer xs = pos xs 1
@@ -423,90 +457,95 @@ posifyer xs = pos xs 1
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
-pos :: Expression -> [(Expression, Int)] -> Int
-pos (Variable s) []           = throw (VariableNotInScope s)
-pos s ((x, i):xs) | s == x    = i
+pos :: Expression -> [(Expression, Int)] -> Maybe Int
+pos (Variable s) []           = Nothing
+pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
+
+cFun :: Expression -> [Instruction]
+cFun x =
+    case x of
+        Val a      -> [Pushval Int a]
+        Variable a -> [Pushfun a]
+
 
 ---------- compileFunktionen:
 
 compileProgram :: [Definition] -> State
-compileProgram (x:xs) = State 0 (compileMain x ++ cProg xs) [] [] []
-    where             --pc---------code-----------------stack-heap-global
-        cProg (x:xs) = compileDef x ++ cProg xs
-        cProg []     = []
--- build HeapCells here or in emulator?
+compileProgram = foldl modifyStateForOneDef State{pc=0, code=startList, stack=[], heap=[], global=[]}
+  where
+    modifyStateForOneDef :: State -> Definition -> State
+    modifyStateForOneDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
+      s { code   = code ++ compileDef def
+        , heap   = heap ++ [DEF fun (length args) (length code)]
+        , global = global ++ [(fun, length heap)] }
 
-compileMain :: Definition -> [Instruction]
-compileMain (Definition [Variable "main"] body) = [Reset, Pushfun "main", Call, Halt, Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return, --BinärOp
-                                                            Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return,                                               --If
-                                                            Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                                                               --UnärOp
-                                                            ++ compileExpr body [] 0 ++ [Updatefun 0, Slide 1, Unwind, Call, Return]
-compileMain _ = throw MissingMain
+startList :: [Instruction]
+startList = [Reset, Pushfun "main", Call, Halt]
+    ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return] --BinärOp
+    ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]                  --If
+    ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
+
+-------------
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (fun:args) body) = compileExpr body (posifyer args) 0 ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
+compileDef (Definition (Variable fun:args) body) = do
+    case body of
+        Variable x -> [Pushfun x, Updatefun n, Slide (n + 1), Unwind, Call, Return]
+        _          -> compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
-        n = length args   
+        n = length args
 
--- getOp :: Expression -> Token
--- getOp x =
---     case x of
---         LessThanX a b   -> LessThan
---         IsX       a b   -> Is
---         Sum       a b   -> Plus
---         Mult      a b   -> Times
---         NotX      a     -> Not
---         Neg       a     -> Minus
---         NegExpo   a     -> DivBy
-
-compileExpr :: Expression -> [(Expression, Int)] -> Int -> [Instruction]
-compileExpr (LetX      (LocDefs a) b)   env i = compileLocDefs a envLet (i-1) ++ compileExpr b envLet (i-1) ++ [Slidelet n]
-    where                                                               -- hier i? checken durch lokaldefinitionen mit parametern!
+compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
+compileExpr (LetX      (LocDefs a) b)   env = compileLocDefs a [(v, pos-1) | (v, pos) <- envLet] ++ compileExpr b [(v, pos-1) | (v, pos) <- envLet] ++ [Slidelet n]
+    where
         n = length a -- Anzahl der Lokaldefinitionen
-        envLet = posifyerLet a
+        envLet = posifyerLet a ++ env
 
-compileExpr (IfX                a  b c) env i = compileExpr c env i ++ compileExpr b env (i+1) ++ compileExpr a env 2 ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
+compileExpr (IfX                a  b c) env = compileExpr c env ++ compileExpr b [(v, pos+1) | (v, pos) <- env] ++ compileExpr a [(v, pos+2) | (v, pos) <- env] ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
 
-compileExpr (NotX               a)      env i = compileExpr a env i ++ [Pushpre Not, Makeapp]
-compileExpr (Neg                a)      env i = compileExpr a env i ++ [Pushpre Minus, Makeapp]
-compileExpr (NegExpo            a)      env i = compileExpr a env i ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
+compileExpr (NotX               a)      env = compileExpr a env ++ [Pushpre Not, Makeapp]
+compileExpr (Neg                a)      env = compileExpr a env ++ [Pushpre Minus, Makeapp]
+compileExpr (NegExpo            a)      env = compileExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
 
--- compileExpr (OrX                a  b)   env i = compileExpr b env i ++ compileExpr a env (i+1) ++ [Pushpre Or, Makeapp, Makeapp]
-compileExpr (OrX                a  b)   env i = compileExpr (IfX a (BoolVal True) b)  env i
-compileExpr (AndX               a  b)   env i = compileExpr (IfX a b (BoolVal False)) env i 
+compileExpr (OrX                a  b)   env = compileExpr (IfX a (BoolVal True) b)  env
+compileExpr (AndX               a  b)   env = compileExpr (IfX a b (BoolVal False)) env 
 
-compileExpr (LessThanX          a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre LessThan, Makeapp, Makeapp]
-compileExpr (IsX                a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Is, Makeapp, Makeapp]
-compileExpr (Sum                a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Plus, Makeapp, Makeapp]
-compileExpr (Mult               a  b)   env i = compileExpr b env i ++ compileExpr a  env (i+1) ++ [Pushpre Times, Makeapp, Makeapp]
-
-compileExpr (Function (Variable a) b)   env i = compileExpr b env i ++ [Pushfun a, Makeapp]
-compileExpr (Val                a)      env i = [Pushval Int a]
-compileExpr (BoolVal            a)      env i = [Pushval Bool x] -- x ist 0 oder 1  
+compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
+compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
+compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
+compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
+compileExpr (Function (Variable a) b)   env = cFun b ++ [Pushfun a, Makeapp]
+compileExpr (Function           a  b)   env = cFun b ++ compileExpr a env ++ [Makeapp]
+compileExpr (Val                a)      env = [Pushval Int a]
+compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
-compileExpr (Variable           a)      env i = [Pushparam (pos (Variable a) env + i)]
+compileExpr (Variable           a)      env = 
+    case pos (Variable a) env of
+        Nothing -> [Pushfun a]
+        Just x  -> [Pushparam x]
 
-compileLocDefs :: [LocDef] -> [(Expression, Int)] -> Int -> [Instruction]
-compileLocDefs x env i = alloc n ++ cLocDefs x env i n
+compileLocDefs :: [LocDef] -> [(Expression, Int)] -> [Instruction]
+compileLocDefs x env = alloc n ++ cLocDefs x env n
     where
-        n = length x -- Anzahl der Lokaldefinitionen
-        alloc 0 = []
-        alloc x = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
-        cLocDefs ((LocDef var expr):xs) env i n = compileExpr expr env i ++ [Updatelet (n-1)] ++ cLocDefs xs env i (n-1)
-        cLocDefs []                     _   _ _ = []
+        n                                     = length x -- Anzahl der Lokaldefinitionen
+        alloc 0                               = []
+        alloc x                               = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
+        cLocDefs ((LocDef var expr):xs) env n = compileExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
+        cLocDefs []                     _   _ = []
 
 posifyerLet :: [LocDef] -> [(Expression, Int)]
-posifyerLet xs = pos xs n
+posifyerLet xs = posL xs n
     where 
         n = length xs
-        pos ((LocDef var _):xs) n = (var, n-1) : pos xs (n-1)
-        pos []                  n = []
+        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
+        posL []                  n = []
 
 ---------- combining functions
+
+parse :: String -> Either String (Program, [Token])
 parse xs = program $ tokenize xs
--- compile2 (Right (Program xs, [])) = compileProgram xs
 
 compile :: String -> Either String State
 compile xs = 
@@ -541,3 +580,23 @@ ex21 = compile "main = let x = 1; y = z; z = 2 in x + y;" -- passt
 ex22 = compile "main = let v1 = v2; v2 = 9 in v1;" --passt
 ex23 = compile "main = let x = y; y = z; z= 1/5 in x;" -- passt
 ex24 = compile "main = let y = x*x; x = 3 in y + 1;" -- passt
+
+
+-- teste Anzahl Definitionen
+e1 = compile "f1 = 1;"
+e2 = compile "f1 = 1; f2 = 2;"
+e3 = compile "f1 = 1; f2 = 2; f3 = 3;"
+
+-- teste Anzahl Funktionsparameter
+e4 = compile "f x = 1;"
+e5 = compile "f x y z w e r = 1;"
+
+-- teste Inhalt Expressions
+e6 = compile "f x = True;"
+e7 = compile "f x = cool;"
+
+-- teste error cases
+e8 = compile "f;"
+e9 = compile "f ="
+e10 = compile "f = 3"
+e11 = compile "f = x;"
