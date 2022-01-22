@@ -413,9 +413,9 @@ atomicExpr (Boolean i : xs1) = return (BoolVal i, xs1) -- do
 atomicExpr (OpenPar : xs1)   = do
     (e, xs2)  <- expr xs1
     case xs2 of
-        ClosePar : xs3 -> return (e, xs2) -- do
+        ClosePar : xs3 -> return (e, xs3) -- do
             -- (es, xs4) <- restAtomicExpr xs3
-            -- return (foldl Function e es, xs4) -- ?
+            -- return (foldl Function e es, xs4)
         (x:_)          -> Left ("Expected: ')', Actual: " ++ show x)
         []             -> Left "Missing ')'"
 atomicExpr (Name i : xs1)    = do
