@@ -132,8 +132,8 @@ instance Show State
                                               ++ "\n\n··········\n: Global :\n··········\n"                ++ showGlobal global ++ "\n"
             where
                 showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
-                showCode (x:xs) 13            = "\n· if operation ·\nc14:  "     ++ show x ++ "\n" ++ showCode xs 14
-                showCode (x:xs) 21            = "\n· unary operation ·\nc22:  "  ++ show x ++ "\n" ++ showCode xs 22
+                showCode (x:xs) 13            = "\n· if operation ·\nc13:  "     ++ show x ++ "\n" ++ showCode xs 14
+                showCode (x:xs) 21            = "\n· unary operation ·\nc21:  "  ++ show x ++ "\n" ++ showCode xs 22
                 showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
                 showCode (Return:xs) akk      
                     | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
@@ -605,3 +605,4 @@ e8 = compile "f;"
 e9 = compile "f ="
 e10 = compile "f = 3"
 e11 = compile "f = x;"
+e12 = compile "bool x = ((x == True) | (x == False)); f x = if bool x | x < 1 then 1 else x * f (x - 1); main = f 6;"
