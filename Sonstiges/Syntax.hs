@@ -3,7 +3,7 @@ RestProgram     ::= e | Def ";" RestProgram
 Def             ::= Variable Restdef Expr
 RestDef         ::= "=" | Variable Restdef
 LocDefs         ::= LocDef RestLocDefs
-RestLocDefs     ::= e | ";" LocDef RestLocDefs
+RestLocDefs     ::= e | "," LocDef RestLocDefs
 LocDef          ::= Variable "=" Expr
 Expr            ::= "let" LocDefs "in" Expr
                   | "if" Expr "then" Expr "else" Expr         

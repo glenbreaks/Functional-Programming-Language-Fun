@@ -5,8 +5,7 @@ data CompilerException
     = InvalidName !String
     | MissingMain
     | TypeCheck !String
-    | VariableNotInScope !String
-    -- | Undefined
+    | VariableNotInScope !String -- Nochmal checken, welche wir im Endeffekt wirklich brauchen
     deriving Show
 
 instance Exception CompilerException
@@ -32,6 +31,7 @@ data Token
     | Then
     | Else
     | Semicolon
+    | Comma
     | Equals
     deriving (Eq, Show)
 
@@ -86,8 +86,8 @@ instance Show Instruction
     where show Reset              = "Reset"
           show (Pushfun fun)      = "Pushfun " ++ fun
           show (Pushval Bool v)
-                      | v == 0    = "Pushval Bool False"
-                      | otherwise = "Pushval Bool True"
+                      | v == 0    = "Pushval Bool false"
+                      | otherwise = "Pushval Bool true"
           show (Pushval t v)      = "Pushval " ++ show t ++ " " ++ show v
           show (Pushparam i)      = "Pushparam " ++ show i
           show Makeapp            = "Makeapp"
@@ -178,6 +178,7 @@ spaceyfier :: String -> String
 spaceyfier x =
    case x of
        ';' : xs       -> " ;"   ++ spaceyfier xs        -- hier kein Leerzeichen danach, da Strichpunkte in Namen eh nicht erlaubt sind!
+       ',' : xs       -> " , "  ++ spaceyfier xs
        '|' : xs       -> " | "  ++ spaceyfier xs
        '&' : xs       -> " & "  ++ spaceyfier xs
        '<' : xs       -> " < "  ++ spaceyfier xs
@@ -210,9 +211,10 @@ tokenizer ("if"    : xs) = If            : tokenizer xs
 tokenizer ("then"  : xs) = Then          : tokenizer xs
 tokenizer ("else"  : xs) = Else          : tokenizer xs
 tokenizer (";"     : xs) = Semicolon     : tokenizer xs
+tokenizer (","     : xs) = Comma         : tokenizer xs
 tokenizer ("="     : xs) = Equals        : tokenizer xs
-tokenizer ("True"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
-tokenizer ("False" : xs) = Boolean False : tokenizer xs
+tokenizer ("true"  : xs) = Boolean True  : tokenizer xs -- klein wär schöner und ala Skript aber input soll output matchen! (was ist output lol)
+tokenizer ("false" : xs) = Boolean False : tokenizer xs
 tokenizer []             = []
 tokenizer (x:xs)
     | checkNumber x                   = Number (read x) : tokenizer xs
@@ -281,7 +283,7 @@ locDefs xs1 = do
     return (LocDefs (e:es), xs3)
 
 restLocDefs :: Parser [LocDef]
-restLocDefs (Semicolon : xs1) = do
+restLocDefs (Comma : xs1) = do
     (e, xs2)  <- locDef xs1
     (es, xs3) <- restLocDefs xs2
     return (e:es, xs3)
@@ -462,16 +464,16 @@ posifyer xs = pos xs 1
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
 pos :: Expression -> [(Expression, Int)] -> Maybe Int
-pos (Variable s) []           = Nothing
+pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
 
-cFun :: Expression -> [Instruction]
-cFun x =
+cFun :: Expression -> [(Expression, Int)] -> [Instruction]
+cFun x env =
     case x of
         Val a      -> [Pushval Int a]
-        Variable a -> [Pushfun a]
-        _          -> []
+        Variable a -> [Pushfun a] 
+        _          -> compileExpr x env
 
 
 ---------- compileFunktionen:
@@ -502,10 +504,10 @@ compileDef (Definition (Variable fun:args) body) = do
         n = length args
 
 compileExpr :: Expression -> [(Expression, Int)] -> [Instruction]
-compileExpr (LetX      (LocDefs a) b)   env = compileLocDefs a [(v, pos-1) | (v, pos) <- envLet] ++ compileExpr b [(v, pos-1) | (v, pos) <- envLet] ++ [Slidelet n]
+compileExpr (LetX      (LocDefs a) b)   env = compileLocDefs a envLet ++ compileExpr b envLet ++ [Slidelet n]
     where
         n = length a -- Anzahl der Lokaldefinitionen
-        envLet = posifyerLet a ++ env
+        envLet = [(v, pos-1) | (v, pos) <- posifyerLet a] ++ [(v, pos+n) | (v, pos) <- env]
 
 compileExpr (IfX                a  b c) env = compileExpr c env ++ compileExpr b [(v, pos+1) | (v, pos) <- env] ++ compileExpr a [(v, pos+2) | (v, pos) <- env] ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
 
@@ -520,8 +522,10 @@ compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a
 compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
 compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-compileExpr (Function (Variable a) b)   env = cFun b ++ [Pushfun a, Makeapp]
-compileExpr (Function           a  b)   env = cFun b ++ compileExpr a env ++ [Makeapp]
+compileExpr (Function           a  b)   env = 
+    case pos b env of
+        Nothing -> cFun b env ++ compileExpr a env ++ [Makeapp]
+        _       -> compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 compileExpr (Val                a)      env = [Pushval Int a]
 compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
@@ -606,3 +610,9 @@ e9 = compile "f ="
 e10 = compile "f = 3"
 e11 = compile "f = x;"
 e12 = compile "bool x = ((x == True) | (x == False)); f x = if bool x | x < 1 then 1 else x * f (x - 1); main = f 6;"
+e13 = compile "f x = if bool x | x < 1 then 1 else x * f (x - 1);"
+e14 = compile "f x = if True then 1 else x * f (x - 1);"
+e15 = compile "f x = f x;"
+e16 = compile "f x y = f x y;"
+e17 = compile "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
+e18 = compile "main = f 3; f x = let y = 5, z = False in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
