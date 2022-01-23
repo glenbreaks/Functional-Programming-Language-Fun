@@ -450,35 +450,25 @@ variable _             = Left "Variable expected"
 
 ---------- Compiler:
 
+-- Hilfsfunktionen:
+
 posifyer :: [Expression] -> [(Expression, Int)]
 posifyer xs = pos xs 1
     where 
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
+posifyerLet :: [LocDef] -> [(Expression, Int)]
+posifyerLet xs = posL xs n
+    where 
+        n = length xs
+        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
+        posL []                  n = []
+
 pos :: Expression -> [(Expression, Int)] -> Maybe Int
 pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
-
-cFun :: Expression -> [(Expression, Int)] -> [Instruction]
-cFun x env =
-    case x of
-        Val a      -> [Pushval Int a]
-        Variable a -> [Pushfun a] 
-        _          -> compileExpr x env
-
-
----------- compileFunktionen:
-
-compileProgram :: [Definition] -> State
-compileProgram = foldl modifyStateForOneDef State{pc=0, code=startList, stack=[], heap=[], global=[]}
-  where
-    modifyStateForOneDef :: State -> Definition -> State
-    modifyStateForOneDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
-      s { code   = code ++ compileDef def
-        , heap   = heap ++ [DEF fun (length args) (length code)]
-        , global = global ++ [(fun, length heap)] }
 
 startList :: [Instruction]
 startList = [Reset, Pushfun "main", Call, Halt]
@@ -486,13 +476,19 @@ startList = [Reset, Pushfun "main", Call, Halt]
     ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]                  --If
     ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
 
--------------
+-- CompileFunktionen:
+
+compileProgram :: [Definition] -> State
+compileProgram = foldl modifyStateForOneDef State{pc=0, code=startList, stack=[], heap=[], global=[]}
+  where
+    modifyStateForOneDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
+      s { code   = code   ++ compileDef def
+        , heap   = heap   ++ [DEF fun (length args) (length code)]
+        , global = global ++ [(fun, length heap)] }
+
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (Variable fun:args) body) = do
-    case body of
-        Variable x -> [Pushfun x, Updatefun n, Slide (n + 1), Unwind, Call, Return]
-        _          -> compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
+compileDef (Definition (Variable fun:args) body) = compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
         n = length args
 
@@ -511,16 +507,13 @@ compileExpr (NegExpo            a)      env = compileExpr a env ++ [Pushpre DivB
 compileExpr (OrX                a  b)   env = compileExpr (IfX a (BoolVal True) b)  env
 compileExpr (AndX               a  b)   env = compileExpr (IfX a b (BoolVal False)) env 
 
-compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
-compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
-compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
-compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-compileExpr (Function           a  b)   env = 
-    case pos b env of
-        Nothing -> cFun b env ++ compileExpr a env ++ [Makeapp]
-        _       -> compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
+compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
+compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
+compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
+compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
+compileExpr (Function           a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 compileExpr (Val                a)      env = [Pushval Int a]
-compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
+compileExpr (BoolVal            a)      env = [Pushval Bool x]
     where x | a         = 1
             | not a     = 0
 compileExpr (Variable           a)      env = 
@@ -536,13 +529,6 @@ compileLocDefs x env = alloc n ++ cLocDefs x env n
         alloc x                               = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
         cLocDefs ((LocDef var expr):xs) env n = compileExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
         cLocDefs []                     _   _ = []
-
-posifyerLet :: [LocDef] -> [(Expression, Int)]
-posifyerLet xs = posL xs n
-    where 
-        n = length xs
-        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
-        posL []                  n = []
 
 ---------- combining functions
 
@@ -608,4 +594,4 @@ e14 = compile "f x = if True then 1 else x * f (x - 1);"
 e15 = compile "f x = f x;"
 e16 = compile "f x y = f x y;"
 e17 = compile "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
-e18 = compile "main = f 3; f x = let y = 5, z = False in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
+e18 = compile "main = f 3; f x = let y = 5, z = false in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
