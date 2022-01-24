@@ -450,25 +450,35 @@ variable _             = Left "Variable expected"
 
 ---------- Compiler:
 
--- Hilfsfunktionen:
-
 posifyer :: [Expression] -> [(Expression, Int)]
 posifyer xs = pos xs 1
     where 
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
-posifyerLet :: [LocDef] -> [(Expression, Int)]
-posifyerLet xs = posL xs n
-    where 
-        n = length xs
-        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
-        posL []                  n = []
-
 pos :: Expression -> [(Expression, Int)] -> Maybe Int
 pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
+
+cFun :: Expression -> [(Expression, Int)] -> [Instruction]
+cFun x env =
+    case x of
+        Val a      -> [Pushval Int a]
+        Variable a -> [Pushfun a] 
+        _          -> compileExpr x env
+
+
+---------- compileFunktionen:
+
+compileProgram :: [Definition] -> State
+compileProgram = foldl modifyStateForOneDef State{pc=0, code=startList, stack=[], heap=[], global=[]}
+  where
+    modifyStateForOneDef :: State -> Definition -> State
+    modifyStateForOneDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
+      s { code   = code ++ compileDef def
+        , heap   = heap ++ [DEF fun (length args) (length code)]
+        , global = global ++ [(fun, length heap)] }
 
 startList :: [Instruction]
 startList = [Reset, Pushfun "main", Call, Halt]
@@ -476,19 +486,13 @@ startList = [Reset, Pushfun "main", Call, Halt]
     ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]                  --If
     ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
 
--- CompileFunktionen:
-
-compileProgram :: [Definition] -> State
-compileProgram = foldl modifyStateForOneDef State{pc=0, code=startList, stack=[], heap=[], global=[]}
-  where
-    modifyStateForOneDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
-      s { code   = code   ++ compileDef def
-        , heap   = heap   ++ [DEF fun (length args) (length code)]
-        , global = global ++ [(fun, length heap)] }
-
+-------------
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (Variable fun:args) body) = compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
+compileDef (Definition (Variable fun:args) body) = do
+    case body of
+        Variable x -> [Pushfun x, Updatefun n, Slide (n + 1), Unwind, Call, Return]
+        _          -> compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
         n = length args
 
@@ -507,13 +511,16 @@ compileExpr (NegExpo            a)      env = compileExpr a env ++ [Pushpre DivB
 compileExpr (OrX                a  b)   env = compileExpr (IfX a (BoolVal True) b)  env
 compileExpr (AndX               a  b)   env = compileExpr (IfX a b (BoolVal False)) env 
 
-compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
-compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
-compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
-compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-compileExpr (Function           a  b)   env = compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
+compileExpr (LessThanX          a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
+compileExpr (IsX                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
+compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
+compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
+compileExpr (Function           a  b)   env = 
+    case pos b env of
+        Nothing -> cFun b env ++ compileExpr a env ++ [Makeapp]
+        _       -> compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 compileExpr (Val                a)      env = [Pushval Int a]
-compileExpr (BoolVal            a)      env = [Pushval Bool x]
+compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
 compileExpr (Variable           a)      env = 
@@ -530,6 +537,13 @@ compileLocDefs x env = alloc n ++ cLocDefs x env n
         cLocDefs ((LocDef var expr):xs) env n = compileExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
         cLocDefs []                     _   _ = []
 
+posifyerLet :: [LocDef] -> [(Expression, Int)]
+posifyerLet xs = posL xs n
+    where 
+        n = length xs
+        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
+        posL []                  n = []
+
 ---------- combining functions
 
 parse :: String -> Either String (Program, [Token])
@@ -540,6 +554,93 @@ compile xs =
     case parse xs of
         (Right (Program xs, [])) -> return (compileProgram xs)
         Left string              -> Left string
+
+interprete :: Either String State -> String
+interprete xs = 
+    case xs of
+        Left xs     -> xs
+        Right s     -> hCode s
+
+hCode :: State -> String
+hCode s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
+    case code of
+        Reset:xs            -> hReset (s {code = xs})
+        (Pushfun arg):xs    -> hPushfun (s {code = xs}) arg
+        (Pushval t v):xs    -> hPushval (s {code = xs}) t v
+        (Pushparam arg):xs  -> hPushparam (s {code = xs}) arg
+        Makeapp:xs          -> hMakeapp (s {code = xs})
+        (Slide arg):xs      -> hSlide (s {code = xs}) arg
+        Return:xs           -> hReturn (s {code = xs})
+        Halt:xs             -> hHalt (s {code = xs})
+        Unwind:xs           -> hUnwind (s {code = xs})
+        Call:xs             -> hCall (s {code = xs})
+        (Pushpre op):xs     -> hPushpre (s {code = xs}) op
+        (Updatefun arg):xs  -> hUpdatefun (s {code = xs}) arg
+        Updateop:xs         -> hUpdateop (s {code = xs})
+        (Operator arg):xs   -> hOperator (s {code = xs}) arg
+        Alloc:xs            -> hAlloc (s {code = xs})
+        (Updatelet arg):xs  -> hUpdatelet (s {code = xs}) arg
+        (Slidelet arg):xs   -> hSlidelet (s {code = xs}) arg
+        []                  -> "" -- Hier muss dann der endgültige Maschinenstate ausgewertet werden und ein Ergebnis ergibt sich, aber wie?
+
+hReset :: State -> String
+hReset s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hPushfun :: State -> String -> String
+hPushfun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1, stack = stack ++ [hSearch global arg]}
+
+hPushval :: State -> Type -> Value -> String
+hPushval s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} t v = hCode s {pc = pc+1, stack = stack ++ [length heap + 1], heap = heap ++ [VAL t v]}
+
+hPushparam :: State -> Int -> String
+hPushparam s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+hMakeapp :: State -> String
+hMakeapp s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hSlide :: State -> Int -> String
+hSlide s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+hReturn :: State -> String
+hReturn s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hHalt :: State -> String
+hHalt s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hUnwind :: State -> String
+hUnwind s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hCall :: State -> String
+hCall s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hPushpre :: State -> Token -> String
+hPushpre s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} op = hCode s {pc = pc+1}
+
+hUpdatefun :: State -> Int -> String
+hUpdatefun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+hUpdateop :: State -> String
+hUpdateop s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hOperator :: State -> Op -> String
+hOperator s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+hAlloc :: State -> String
+hAlloc s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hUpdatelet :: State -> Int -> String
+hUpdatelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+hSlidelet :: State -> Int -> String
+hSlidelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+hSearch :: [(String, Int)] -> String -> Int
+hSearch ((x, y):xs) arg
+    | x == arg      = y
+    | otherwise     = hSearch xs arg
+
+run :: String -> String
+run xs = interprete $ compile xs
 
 ---------- test examples
 
@@ -594,4 +695,4 @@ e14 = compile "f x = if True then 1 else x * f (x - 1);"
 e15 = compile "f x = f x;"
 e16 = compile "f x y = f x y;"
 e17 = compile "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
-e18 = compile "main = f 3; f x = let y = 5, z = false in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
+e18 = compile "main = f 3; f x = let y = 5, z = False in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
