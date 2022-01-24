@@ -139,9 +139,11 @@ instance Show State
                     | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
+                showCode [] _                 = ""
                 name n (x:xs)                 = if (\(DEF _ _ adr) -> adr) x == n then (\(DEF fun _ _) -> fun) x else name n xs
                 name _ []                     = ""
                 showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
+                showHeap ((VAL typ val):xs)   = "VAL " ++ show typ ++ " " ++ show val ++ "\n" ++ showHeap xs  -- Erweitern um INT, PRE und APP
                 showHeap []                   = []
                 showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
                 showGlobal []                 = ""
@@ -555,92 +557,95 @@ compile xs =
         (Right (Program xs, [])) -> return (compileProgram xs)
         Left string              -> Left string
 
-interprete :: Either String State -> String
+interprete :: Either String State -> Either String State
 interprete xs = 
     case xs of
-        Left xs     -> xs
-        Right s     -> hCode s
+        Left xs     -> Left xs
+        Right s     -> return (hCode s)
 
-hCode :: State -> String
+run :: State -> State
+run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = s{pc = pc+1, stack = (\s@State{stack = stack} -> stack) (hCode s)}
+
+hCode :: State -> State
 hCode s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
     case code of
         Reset:xs            -> hReset (s {code = xs})
         (Pushfun arg):xs    -> hPushfun (s {code = xs}) arg
         (Pushval t v):xs    -> hPushval (s {code = xs}) t v
-        (Pushparam arg):xs  -> hPushparam (s {code = xs}) arg
-        Makeapp:xs          -> hMakeapp (s {code = xs})
-        (Slide arg):xs      -> hSlide (s {code = xs}) arg
-        Return:xs           -> hReturn (s {code = xs})
+--        (Pushparam arg):xs  -> hPushparam (s {code = xs}) arg
+--        Makeapp:xs          -> hMakeapp (s {code = xs})
+        -- (Slide arg):xs      -> hSlide (s {code = xs}) arg
+        -- Return:xs           -> hReturn (s {code = xs})
+        -- Unwind:xs           -> hUnwind (s {code = xs})
+        -- Call:xs             -> hCall (s {code = xs})
+        -- (Pushpre op):xs     -> hPushpre (s {code = xs}) op
+        -- (Updatefun arg):xs  -> hUpdatefun (s {code = xs}) arg
+        -- Updateop:xs         -> hUpdateop (s {code = xs})
+        -- (Operator arg):xs   -> hOperator (s {code = xs}) arg
+        -- Alloc:xs            -> hAlloc (s {code = xs})
+        -- (Updatelet arg):xs  -> hUpdatelet (s {code = xs}) arg
+        -- (Slidelet arg):xs   -> hSlidelet (s {code = xs}) arg
         Halt:xs             -> hHalt (s {code = xs})
-        Unwind:xs           -> hUnwind (s {code = xs})
-        Call:xs             -> hCall (s {code = xs})
-        (Pushpre op):xs     -> hPushpre (s {code = xs}) op
-        (Updatefun arg):xs  -> hUpdatefun (s {code = xs}) arg
-        Updateop:xs         -> hUpdateop (s {code = xs})
-        (Operator arg):xs   -> hOperator (s {code = xs}) arg
-        Alloc:xs            -> hAlloc (s {code = xs})
-        (Updatelet arg):xs  -> hUpdatelet (s {code = xs}) arg
-        (Slidelet arg):xs   -> hSlidelet (s {code = xs}) arg
-        []                  -> "" -- Hier muss dann der endgültige Maschinenstate ausgewertet werden und ein Ergebnis ergibt sich, aber wie?
 
-hReset :: State -> String
-hReset s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+hReset :: State -> State
+hReset s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = -1}
 
-hPushfun :: State -> String -> String
-hPushfun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1, stack = stack ++ [hSearch global arg]}
+hPushfun :: State -> String -> State
+hPushfun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1, stack = stack ++ [hSearch global arg | hSearch global arg /= -1] }
 
-hPushval :: State -> Type -> Value -> String
+hPushval :: State -> Type -> Value -> State
 hPushval s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} t v = hCode s {pc = pc+1, stack = stack ++ [length heap + 1], heap = heap ++ [VAL t v]}
 
-hPushparam :: State -> Int -> String
-hPushparam s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
-hMakeapp :: State -> String
-hMakeapp s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
-hSlide :: State -> Int -> String
-hSlide s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
-hReturn :: State -> String
-hReturn s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
-hHalt :: State -> String
+hHalt :: State -> State
 hHalt s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
 
-hUnwind :: State -> String
-hUnwind s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+-- hPushparam :: State -> Int -> String
+-- hPushparam s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
 
-hCall :: State -> String
-hCall s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+-- hMakeapp :: State -> String
+-- hMakeapp s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
 
-hPushpre :: State -> Token -> String
-hPushpre s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} op = hCode s {pc = pc+1}
+-- hSlide :: State -> Int -> String
+-- hSlide s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
 
-hUpdatefun :: State -> Int -> String
-hUpdatefun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+-- hReturn :: State -> String
+-- hReturn s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
 
-hUpdateop :: State -> String
-hUpdateop s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+-- hUnwind :: State -> String
+-- hUnwind s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
 
-hOperator :: State -> Op -> String
-hOperator s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+-- hCall :: State -> String
+-- hCall s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
 
-hAlloc :: State -> String
-hAlloc s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+-- hPushpre :: State -> Token -> String
+-- hPushpre s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} op = hCode s {pc = pc+1}
 
-hUpdatelet :: State -> Int -> String
-hUpdatelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+-- hUpdatefun :: State -> Int -> String
+-- hUpdatefun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
 
-hSlidelet :: State -> Int -> String
-hSlidelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+-- hUpdateop :: State -> String
+-- hUpdateop s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+-- hOperator :: State -> Op -> String
+-- hOperator s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+-- hAlloc :: State -> String
+-- hAlloc s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
+
+-- hUpdatelet :: State -> Int -> String
+-- hUpdatelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
+
+-- hSlidelet :: State -> Int -> String
+-- hSlidelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
 
 hSearch :: [(String, Int)] -> String -> Int
 hSearch ((x, y):xs) arg
     | x == arg      = y
     | otherwise     = hSearch xs arg
+hSearch [] _ = -1
 
-run :: String -> String
-run xs = interprete $ compile xs
+-- run :: String -> String
+-- run xs = interprete $ compile xs
 
 ---------- test examples
 
