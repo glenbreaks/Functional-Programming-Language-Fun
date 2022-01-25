@@ -3,6 +3,7 @@ import Control.Exception (Exception, throw)
 
 data CompilerException 
     = InvalidName !String
+    | WrongAddress
     | MissingMain
     | TypeCheck !String
     | VariableNotInScope !String -- Nochmal checken, welche wir im Endeffekt wirklich brauchen
@@ -143,10 +144,10 @@ instance Show State
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
                 showCode [] _                 = ""
-                name n (x:xs)                 = 
+                name n (x:xs)                 =
                     case x of
-                        DEF _ _ adr -> if adr == n then (\(DEF fun _ _) -> fun) x else name n xs
-                        _           -> name n xs
+                        DEF f _ adr -> if n == adr then f else name n xs
+                        _           -> ""
                 name _ []                     = ""
                 -- showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
                 -- showHeap ((VAL typ val):xs)   = "VAL " ++ show typ ++ " " ++ show val ++ "\n" ++ showHeap xs  -- Erweitern um INT, PRE und APP
@@ -578,6 +579,34 @@ compile xs =
 -- run :: State -> State
 -- run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = s{pc = pc+1, stack = (\s@State{stack = stack} -> stack) (hCode s)}
 
+----------Hilfsfunktionen Interpreter ala Skript:
+
+address :: String -> [(String, Int)] -> Int
+address arg ((x, y):xs)
+    | x == arg  = y
+    | otherwise = address arg xs
+address _ []    = throw WrongAddress
+
+add2arg :: Int -> [HeapCell] -> Int
+add2arg adr h =
+    case h!!adr of
+        APP _ x -> x
+        _       -> throw WrongAddress
+        
+typ :: Int -> [HeapCell] -> Type
+typ adr h =
+    case h!!adr of
+        VAL Int _ -> Int
+        _         -> Bool
+
+val :: HeapCell -> [HeapCell] -> HeapCell
+val x h =
+    case x of
+        IND adr -> val (h!!adr) h
+        _       -> x
+
+---------------
+
 emulate :: String -> Either String State
 emulate xs = 
     case compile xs of
@@ -595,7 +624,7 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
 pcf :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
 pcf Unwind p s h = 
     case val (h!!(s!!(length s-1))) h of
-        APP x _ -> p+0
+        APP _ _ -> p+0
         _       -> p+1
 pcf Call   p s h =
     case val (h!!(s!!(length s-1))) h of
@@ -624,7 +653,7 @@ stackf Unwind          _ s h _ =
 stackf Call            p s h _ =
     case val (h!!(s!!(length s-1))) h of
         DEF {}  -> s ++ [p+1]
-        PRE _ _ -> s ++ [p]
+        PRE _ _ -> s ++ [p+1]
         _       -> s
 stackf Return          _ s _ _ = init (init s) ++ [last s]
 stackf (Pushpre op)    _ s h _ = s ++ [length h]
@@ -690,30 +719,6 @@ arity Not   = UnaryOp
 arity Minus = UnaryOp
 arity DivBy = UnaryOp
 arity _     = BinaryOp
-
-address :: String -> [(String, Int)] -> Int
-address arg ((x, y):xs)
-    | x == arg  = y
-    | otherwise = address arg xs
-address _ []    = -1 -- darf niemals tatsächlich in den Stack geladen werden -> lieber error oder Nothing?
-
-add2arg :: Int -> [HeapCell] -> Int
-add2arg adr h =
-    case h!!adr of
-        APP _ x -> x
-        _       -> -1 -- auch hier error oder Nothing??
-
-typ :: Int -> [HeapCell] -> Type
-typ adr h =
-    case h!!adr of
-        VAL Int _ -> Int
-        _         -> Bool
-
-val :: HeapCell -> [HeapCell] -> HeapCell
-val x h =
-    case x of
-        IND adr -> val (h!!adr) h
-        _       -> x
 
 -- hCode :: State -> State
 -- hCode s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
@@ -865,3 +870,6 @@ e24 = run (State 12 [Call, Halt,Halt, Halt, Halt] [3,5,4,3] [IND 5, VAL Int 2, V
 e241 = stackf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1] []
 e242 = heapf Call [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
 e243 = pcf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
+
+e25 = run (State 0 (startList ++ [Call, Halt]) [] [DEF "main" 0 27] [("main", 0)])
+-- call PRE funktioniert, aber danach gitb es ein Index Problem
