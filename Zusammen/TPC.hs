@@ -128,9 +128,11 @@ data State = State
     } -- deriving Show
 
 instance Show State
-    where show (State _ code _ heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
-                                              ++ "\n········\n: Heap :\n········\n"                        ++ showHeap heap 
-                                              ++ "\n\n··········\n: Global :\n··········\n"                ++ showGlobal global ++ "\n"
+    where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
+                                               ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
+                                               ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
+                                               ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
+                                               ++ "\n"
             where
                 showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
                 showCode (x:xs) 13            = "\n· if operation ·\nc13:  "     ++ show x ++ "\n" ++ showCode xs 14
@@ -141,11 +143,17 @@ instance Show State
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
                 showCode [] _                 = ""
-                name n (x:xs)                 = if (\(DEF _ _ adr) -> adr) x == n then (\(DEF fun _ _) -> fun) x else name n xs
+                name n (x:xs)                 = 
+                    case x of
+                        DEF _ _ adr -> if adr == n then (\(DEF fun _ _) -> fun) x else name n xs
+                        _           -> name n xs
                 name _ []                     = ""
-                showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
-                showHeap ((VAL typ val):xs)   = "VAL " ++ show typ ++ " " ++ show val ++ "\n" ++ showHeap xs  -- Erweitern um INT, PRE und APP
-                showHeap []                   = []
+                -- showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
+                -- showHeap ((VAL typ val):xs)   = "VAL " ++ show typ ++ " " ++ show val ++ "\n" ++ showHeap xs  -- Erweitern um INT, PRE und APP
+                showStack (x:xs) akk          = "s" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showStack xs (akk+1)
+                showStack [] _                = ""
+                showHeap (x:xs) akk           = "h" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showHeap xs (akk+1)
+                showHeap [] _                 = ""
                 showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
                 showGlobal []                 = ""
                 indent 0                      = ""
@@ -161,7 +169,7 @@ data HeapCell
     | VAL Type Value        -- Blätter
     | IND Int               -- HeapAdress
     | PRE Token Op
-    deriving Show
+    deriving Show --instance damit nicht mehr "funktionsnamen" (ist schon in show State auskommentiert!)
 
 data Op
     = UnaryOp
@@ -579,59 +587,94 @@ emulate xs =
 run :: State -> State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = 
     let i = code!!pc in
-    if i /= Halt then run s { pc    = pc + pcf i stack heap
+    if i /= Halt then run s { pc    = pcf i pc stack heap
                             , stack = stackf i pc stack heap global
-                            , heap  = heap ++ heapf i heap stack }
+                            , heap  = heapf i stack heap }
                  else s
 
-pcf :: Instruction -> [Int] -> [HeapCell] -> Int
-pcf Unwind s h = 
-    case val (h!!(length s-1)) h of
-        APP x _ -> 0
-        _       -> 1
-pcf Call   s h =
-    case h!!(s!!length s-1) of
-        DEF _ _ adr  -> adr
+pcf :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
+pcf Unwind p s h = 
+    case val (h!!(s!!(length s-1))) h of
+        APP x _ -> p+0
+        _       -> p+1
+pcf Call   p s h =
+    case val (h!!(s!!(length s-1))) h of
+        DEF _ _ adr    -> adr
         PRE _ BinaryOp -> 4
         PRE _ IfOp     -> 13
         PRE _ UnaryOp  -> 21
-        _            -> 1 -- VAL
-pcf Return s h = s!!(length s-2)
-pcf _      _ _ = 1
+        _              -> p+1 -- VAL
+pcf Return p s _ = s!!(length s-2)
+pcf _      p _ _ = p+1
 
 -- falls new hier nicht klappt, dann für die funktionen die es benötigen
 -- (Makeapp, Pushval,...) oben cases im run erstellen!
 stackf :: Instruction -> Int -> [Int] -> [HeapCell] -> [(String, Int)] -> [Int]
 stackf (Pushfun arg)   _ s _ g = s ++ [address arg g]
 stackf (Pushval t v)   _ s h _ = s ++ [length h] -- new
-stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-3)) h] -- hier -3 da length s eins zu groß ist
-stackf Makeapp         _ s h _ = init s ++ [length h] -- letztes stack element überschreiben (t-1 im skript)
+stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h] -- hier -3 da length s eins zu groß ist
+stackf Makeapp         _ s h _ = init (init s) ++ [length h] -- letztes stack element überschreiben (t-1 im skript)
 stackf (Slide arg)     _ s _ _ = slider (length s-arg-2) 0 ++ [s!!(length s-2), s!!(length s-1)]
     where slider n akk | n > 0     = s!!akk : slider (n-1) (akk+1)
                        | otherwise = []
 stackf Unwind          _ s h _ =
-    case val (h!!(length s-1)) h of
+    case val (h!!(s!!(length s-1))) h of
         APP x _ -> s ++ [x]
-        _       -> []
+        _       -> s
 stackf Call            p s h _ =
-    case h!!(s!!length s-1) of
-        DEF {}       -> s ++ [p]
-        PRE _ BinaryOp -> s ++ [p]
-        PRE _ IfOp     -> s ++ [p]
-        PRE _ UnaryOp  -> s ++ [p]
-        _            -> s
+    case val (h!!(s!!(length s-1))) h of
+        DEF {}  -> s ++ [p+1]
+        PRE _ _ -> s ++ [p]
+        _       -> s
 stackf Return          _ s _ _ = init (init s) ++ [last s]
 stackf (Pushpre op)    _ s h _ = s ++ [length h]
-stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)]
+stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 3), s!!(length s - 2)] -- Diskrepanz zwischen Zhus NOtiz auf Seite 84 und Auswertung!) unseres ist nach Auswertung (heap[stack[T]] = last heap)
+stackf (Operator op)   _ s h _ =
+    case op of
+        UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), length h]
+        BinaryOp -> init (init $ init $ init $ init s) ++ [s!!(length s-3), length h]
+        _        -> let a = val (h!!(s!!(length s-1))) h
+                    in init (init $ init $ init $ init s) ++
+                      if (\(VAL Bool v) -> v) a == 1
+                      then [add2arg(s!!(length s-5)) h, s!!(length s-2)]
+                      else [add2arg(s!!(length s-6)) h, s!!(length s-2)]
 stackf _               _ s _ _ = s -- Reset, Updatefun
 
-heapf :: Instruction -> [HeapCell] -> [Int] -> [HeapCell]
-heapf (Pushval t v) h _ = h ++ [VAL t v]
-heapf Makeapp       h s = h ++ [APP (s!!length s-1)  (s!!length s-2)]
-heapf (Pushpre op)  h _ = h ++ [PRE op (arity op)]
-heapf Updateop      h s = insert1 (s!!(length s-1)) 0 h ++ [last h] ++ insert2 (s!!(length s-1)) h
-heapf (Updatefun f) h s = insert1 (s!!(length s-f-3)) 0 h ++ [IND (s!!(length s-1))] ++ insert2 (s!!(length s-f-3)) h
-heapf _             h _ = h -- Pushfun, Reset, Pushparam, Slide, Unwind, Call, Return
+heapf :: Instruction -> [Int] -> [HeapCell] -> [HeapCell]
+heapf (Pushval t v) _ h = h ++ [VAL t v]
+heapf Makeapp       s h = h ++ [APP (s!!(length s-1))  (s!!(length s-2))]
+heapf (Pushpre op)  _ h = h ++ [PRE op (arity op)]
+heapf Updateop      s h = insert1 (s!!(length s-1)) 0 h ++ [last h] ++ insert2 (s!!(length s-1)) h
+heapf (Updatefun f) s h = insert1 (s!!(length s-f-3)) 0 h ++ [IND (s!!(length s-1))] ++ insert2 (s!!(length s-f-3)) h
+heapf (Operator op) s h =
+    case op of
+        UnaryOp  -> let a = val (h!!(s!!(length s-3))) h
+                        b = val (h!!(s!!(length s-1))) h
+                    in h ++ [VAL ((\(VAL t _) -> t) b) ((\(VAL _ v) (PRE op _) -> compute op v 0) b a)]
+        BinaryOp -> let a = val (h!!(s!!(length s-4))) h
+                        b = val (h!!(s!!(length s-2))) h
+                        c = val (h!!(s!!(length s-1))) h
+                    in h ++ [VAL (findType ((\(PRE op _) -> op) a)) ((\(VAL _ v1) (VAL _ v2) (PRE op _) -> compute op v1 v2) b c a)]
+        _        -> h
+heapf _             _ h = h -- Pushfun, Reset, Pushparam, Slide, Unwind, Call, Return
+
+compute :: Token -> Value -> Value -> Value
+compute Not      x _ | x == 0    = 1
+                     | otherwise = 0
+compute Minus    x _ = - x
+compute DivBy    x _ = 1 `div` x
+
+compute LessThan x y | x < y      = 1
+                     | otherwise = 0
+compute Is       x y | x == y    = 1
+                     | otherwise = 0
+compute Plus     x y = x + y
+compute Times    x y = x * y
+
+findType :: Token -> Type
+findType Plus  = Int
+findType Times = Int
+findType _     = Bool
 
 insert1 :: Int -> Int -> [HeapCell] -> [HeapCell]
 insert1 adr akk h | adr > 0          = h!!akk : insert1 (adr-1) (akk+1) h
@@ -648,18 +691,17 @@ arity Minus = UnaryOp
 arity DivBy = UnaryOp
 arity _     = BinaryOp
 
-
 address :: String -> [(String, Int)] -> Int
 address arg ((x, y):xs)
-    | x == arg      = y
-    | otherwise     = address arg xs
-address _ [] = -1
+    | x == arg  = y
+    | otherwise = address arg xs
+address _ []    = -1 -- darf niemals tatsächlich in den Stack geladen werden -> lieber error oder Nothing?
 
 add2arg :: Int -> [HeapCell] -> Int
 add2arg adr h =
     case h!!adr of
         APP _ x -> x
-        _       -> -1
+        _       -> -1 -- auch hier error oder Nothing??
 
 typ :: Int -> [HeapCell] -> Type
 typ adr h =
@@ -809,5 +851,17 @@ h2 = DEF "g" 1 2
 h1 = DEF "f" 1 1    
 h0 = VAL Int 1    
 l = [h0,h1,h2,h3,h4,h5]
-e19 = heapf Updateop l [1,2,3,4,5,2]
-e20 = heapf (Updatefun 1) l [1,2,3,4,5,2]
+e19 = heapf Updateop  [1,2,3,4,5,2] l
+e20 = heapf (Updatefun 1) [1,2,3,4,5,2] l
+e21 = emulate "main = 1;" -- passt! <3
+e22 = run (State 0 ([Reset, Pushfun "main", Call, Halt]
+                 ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return]
+                 ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]
+                 ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]
+                 ++ [Pushfun "x", Updatefun 0, Slide 1, Unwind, Call, Return]) [] [DEF "f" 0 27] [("f", 0)]) -- emulate "f = x;" ausgeschrieben
+e23 = emulate "main = 1+2;"
+e24 = run (State 12 [Call, Halt,Halt, Halt, Halt] [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1] [("main", 0)])
+-- wieso geht e24 nicht aber die drei folgenden schon:
+e241 = stackf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1] []
+e242 = heapf Call [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
+e243 = pcf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
