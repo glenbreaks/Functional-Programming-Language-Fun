@@ -624,7 +624,7 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
 pcf :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
 pcf Unwind p s h = 
     case val (h!!(s!!(length s-1))) h of
-        APP _ _ -> p+0
+        APP _ _ -> p
         _       -> p+1
 pcf Call   p s h =
     case val (h!!(s!!(length s-1))) h of
@@ -650,14 +650,14 @@ stackf Unwind          _ s h _ =
     case val (h!!(s!!(length s-1))) h of
         APP x _ -> s ++ [x]
         _       -> s
-stackf Call            p s h _ =
+stackf Call            p s h _ =        -- passt wir habens 100 mal getestet
     case val (h!!(s!!(length s-1))) h of
         DEF {}  -> s ++ [p+1]
         PRE _ _ -> s ++ [p+1]
         _       -> s
 stackf Return          _ s _ _ = init (init s) ++ [last s]
 stackf (Pushpre op)    _ s h _ = s ++ [length h]
-stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 3), s!!(length s - 2)] -- Diskrepanz zwischen Zhus NOtiz auf Seite 84 und Auswertung!) unseres ist nach Auswertung (heap[stack[T]] = last heap)
+stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)] -- Diskrepanz zwischen Zhus NOtiz auf Seite 84 und Auswertung!) unseres ist nach Auswertung (heap[stack[T]] = last heap)
 stackf (Operator op)   _ s h _ =
     case op of
         UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), length h]
