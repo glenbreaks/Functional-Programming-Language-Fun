@@ -1,5 +1,6 @@
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
+import Graphics.Win32.GDI (sizeofLPBITMAPFILEHEADER)
 
 data CompilerException 
     = InvalidName !String
@@ -133,13 +134,14 @@ instance Show State
                                                ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
                                                ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
                                                ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
-                                               ++ "\n"
+                                               ++ "\n\n\n>>> Result: "                                         ++ showResult (val(last heap) heap)
+                                               ++ "\n\n"
             where
                 showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
                 showCode (x:xs) 13            = "\n· if operation ·\nc13:  "     ++ show x ++ "\n" ++ showCode xs 14
                 showCode (x:xs) 21            = "\n· unary operation ·\nc21:  "  ++ show x ++ "\n" ++ showCode xs 22
                 showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
-                showCode (Return:xs) akk      
+                showCode (Return:xs) akk
                     | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
@@ -149,8 +151,6 @@ instance Show State
                         DEF f _ adr -> if n == adr then f else name n xs
                         _           -> ""
                 name _ []                     = ""
-                -- showHeap ((DEF fun n adr):xs) = "DEF " ++ fun ++ " " ++ show n ++ " c" ++ show adr ++ "\n" ++ showHeap xs
-                -- showHeap ((VAL typ val):xs)   = "VAL " ++ show typ ++ " " ++ show val ++ "\n" ++ showHeap xs  -- Erweitern um INT, PRE und APP
                 showStack (x:xs) akk          = "s" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showStack xs (akk+1)
                 showStack [] _                = ""
                 showHeap (x:xs) akk           = "h" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showHeap xs (akk+1)
@@ -159,6 +159,12 @@ instance Show State
                 showGlobal []                 = ""
                 indent 0                      = ""
                 indent n                      = " " ++ indent (n-1)
+                showResult x                  =
+                    case x of
+                        VAL Bool 1 -> show True
+                        VAL Bool _ -> show False
+                        VAL _    a -> show a
+                        _          -> show x
     
 type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
 type Heap   = [HeapCell]
@@ -170,7 +176,16 @@ data HeapCell
     | VAL Type Value        -- Blätter
     | IND Int               -- HeapAdress
     | PRE Token Op
-    deriving Show --instance damit nicht mehr "funktionsnamen" (ist schon in show State auskommentiert!)
+    | UNINITIALIZED
+
+instance Show HeapCell
+    where show (APP a b  )   = "APP " ++ show a ++ " " ++ show b
+          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " " ++ show y
+          show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
+          show (IND x    )   = "IND " ++ show x
+          show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
+          show UNINITIALIZED = ""
+
 
 data Op
     = UnaryOp
@@ -643,9 +658,7 @@ stackf (Pushfun arg)   _ s _ g = s ++ [address arg g]
 stackf (Pushval t v)   _ s h _ = s ++ [length h] -- new
 stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h] -- hier -3 da length s eins zu groß ist
 stackf Makeapp         _ s h _ = init (init s) ++ [length h] -- letztes stack element überschreiben (t-1 im skript)
-stackf (Slide arg)     _ s _ _ = slider (length s-arg-2) 0 ++ [s!!(length s-2), s!!(length s-1)]
-    where slider n akk | n > 0     = s!!akk : slider (n-1) (akk+1)
-                       | otherwise = []
+stackf (Slide arg)     _ s _ _ = slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)]
 stackf Unwind          _ s h _ =
     case val (h!!(s!!(length s-1))) h of
         APP x _ -> s ++ [x]
@@ -667,6 +680,9 @@ stackf (Operator op)   _ s h _ =
                       if (\(VAL Bool v) -> v) a == 1
                       then [add2arg(s!!(length s-5)) h, s!!(length s-2)]
                       else [add2arg(s!!(length s-6)) h, s!!(length s-2)]
+stackf Alloc           _ s h _ = s ++ [length h]
+stackf (Updatelet _)   _ s h _ = init s
+stackf (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
 stackf _               _ s _ _ = s -- Reset, Updatefun
 
 heapf :: Instruction -> [Int] -> [HeapCell] -> [HeapCell]
@@ -685,6 +701,8 @@ heapf (Operator op) s h =
                         c = val (h!!(s!!(length s-1))) h
                     in h ++ [VAL (findType ((\(PRE op _) -> op) a)) ((\(VAL _ v1) (VAL _ v2) (PRE op _) -> compute op v1 v2) b c a)]
         _        -> h
+heapf Alloc         _ h = h ++ [UNINITIALIZED]
+heapf (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (s!!(length s-1))] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
 heapf _             _ h = h -- Pushfun, Reset, Pushparam, Slide, Unwind, Call, Return
 
 compute :: Token -> Value -> Value -> Value
@@ -693,12 +711,16 @@ compute Not      x _ | x == 0    = 1
 compute Minus    x _ = - x
 compute DivBy    x _ = 1 `div` x
 
-compute LessThan x y | x < y      = 1
+compute LessThan x y | x < y     = 1
                      | otherwise = 0
 compute Is       x y | x == y    = 1
                      | otherwise = 0
 compute Plus     x y = x + y
 compute Times    x y = x * y
+
+slider :: Int -> [Int] -> Int -> [Int]
+slider n s akk | n > 0     = s!!akk : slider (n-1) s (akk+1)
+               | otherwise = []
 
 findType :: Token -> Type
 findType Plus  = Int
@@ -719,81 +741,6 @@ arity Not   = UnaryOp
 arity Minus = UnaryOp
 arity DivBy = UnaryOp
 arity _     = BinaryOp
-
--- hCode :: State -> State
--- hCode s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
---     case code of
---         Reset:xs            -> hReset (s {code = xs})
---         (Pushfun arg):xs    -> hPushfun (s {code = xs}) arg
---         (Pushval t v):xs    -> hPushval (s {code = xs}) t v
---        (Pushparam arg):xs  -> hPushparam (s {code = xs}) arg
---        Makeapp:xs          -> hMakeapp (s {code = xs})
-        -- (Slide arg):xs      -> hSlide (s {code = xs}) arg
-        -- Return:xs           -> hReturn (s {code = xs})
-        -- Unwind:xs           -> hUnwind (s {code = xs})
-        -- Call:xs             -> hCall (s {code = xs})
-        -- (Pushpre op):xs     -> hPushpre (s {code = xs}) op
-        -- (Updatefun arg):xs  -> hUpdatefun (s {code = xs}) arg
-        -- Updateop:xs         -> hUpdateop (s {code = xs})
-        -- (Operator arg):xs   -> hOperator (s {code = xs}) arg
-        -- Alloc:xs            -> hAlloc (s {code = xs})
-        -- (Updatelet arg):xs  -> hUpdatelet (s {code = xs}) arg
-        -- (Slidelet arg):xs   -> hSlidelet (s {code = xs}) arg
-        -- Halt:xs             -> hHalt (s {code = xs})
-
--- hReset :: State -> State
--- hReset s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = -1}
-
--- hPushfun :: State -> String -> State
--- hPushfun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1, stack = stack ++ [address global arg | address global arg /= -1] }
-
--- hPushval :: State -> Type -> Value -> State
--- hPushval s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} t v = hCode s {pc = pc+1, stack = stack ++ [length heap + 1], heap = heap ++ [VAL t v]}
-
--- hHalt :: State -> State
--- hHalt s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hPushparam :: State -> Int -> String
--- hPushparam s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- hMakeapp :: State -> String
--- hMakeapp s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hSlide :: State -> Int -> String
--- hSlide s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- hReturn :: State -> String
--- hReturn s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hUnwind :: State -> String
--- hUnwind s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hCall :: State -> String
--- hCall s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hPushpre :: State -> Token -> String
--- hPushpre s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} op = hCode s {pc = pc+1}
-
--- hUpdatefun :: State -> Int -> String
--- hUpdatefun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- hUpdateop :: State -> String
--- hUpdateop s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hOperator :: State -> Op -> String
--- hOperator s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- hAlloc :: State -> String
--- hAlloc s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = hCode s {pc = pc+1}
-
--- hUpdatelet :: State -> Int -> String
--- hUpdatelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- hSlidelet :: State -> Int -> String
--- hSlidelet s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} arg = hCode s {pc = pc+1}
-
--- run :: String -> String
--- run xs = interprete $ compile xs
 
 ---------- test examples
 
