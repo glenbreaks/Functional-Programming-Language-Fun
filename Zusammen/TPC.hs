@@ -5,6 +5,7 @@ import Graphics.Win32.GDI (sizeofLPBITMAPFILEHEADER)
 data CompilerException 
     = InvalidName !String
     | WrongAddress
+    | NoValueFound !String
     | MissingMain
     | TypeCheck !String
     | VariableNotInScope !String -- Nochmal checken, welche wir im Endeffekt wirklich brauchen
@@ -146,7 +147,7 @@ instance Show State
                     | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
                 showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
                 showCode [] _                 = ""
-                name n (x:xs)                 =
+                name n (x:xs)                 =     -- Bringt mit emulate nichts, nur mit compile
                     case x of
                         DEF f _ adr -> if n == adr then f else name n xs
                         _           -> ""
@@ -489,14 +490,6 @@ pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
 
-cFun :: Expression -> [(Expression, Int)] -> [Instruction]
-cFun x env =
-    case x of
-        Val a      -> [Pushval Int a]
-        Variable a -> [Pushfun a] 
-        _          -> compileExpr x env
-
-
 ---------- compileFunktionen:
 
 compileProgram :: [Definition] -> State
@@ -545,7 +538,7 @@ compileExpr (Sum                a  b)   env = compileExpr b env ++ compileExpr a
 compileExpr (Mult               a  b)   env = compileExpr b env ++ compileExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
 compileExpr (Function           a  b)   env = 
     case pos b env of
-        Nothing -> cFun b env ++ compileExpr a env ++ [Makeapp]
+        Nothing -> compileExpr b env ++ compileExpr a env ++ [Makeapp]
         _       -> compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 compileExpr (Val                a)      env = [Pushval Int a]
 compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
@@ -596,6 +589,11 @@ compile xs =
 
 ----------Hilfsfunktionen Interpreter ala Skript:
 
+-- s = stack
+-- h = heap
+-- g = global
+
+-- address sucht in der globalen Umgebung nach dem Funktionsnamen einer Definition und liefert die HeapAdresse dieser Definition
 address :: String -> [(String, Int)] -> Int
 address arg ((x, y):xs)
     | x == arg  = y
@@ -638,11 +636,11 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
 
 pcf :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
 pcf Unwind p s h = 
-    case val (h!!(s!!(length s-1))) h of
+    case val (h!!last s) h of
         APP _ _ -> p
         _       -> p+1
 pcf Call   p s h =
-    case val (h!!(s!!(length s-1))) h of
+    case val (h!!last s) h of
         DEF _ _ adr    -> adr
         PRE _ BinaryOp -> 4
         PRE _ IfOp     -> 13
@@ -660,11 +658,11 @@ stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h] -- hier 
 stackf Makeapp         _ s h _ = init (init s) ++ [length h] -- letztes stack element überschreiben (t-1 im skript)
 stackf (Slide arg)     _ s _ _ = slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)]
 stackf Unwind          _ s h _ =
-    case val (h!!(s!!(length s-1))) h of
+    case val (h!!last s) h of
         APP x _ -> s ++ [x]
         _       -> s
 stackf Call            p s h _ =        -- passt wir habens 100 mal getestet
-    case val (h!!(s!!(length s-1))) h of
+    case val (h!!last s) h of
         DEF {}  -> s ++ [p+1]
         PRE _ _ -> s ++ [p+1]
         _       -> s
@@ -675,11 +673,16 @@ stackf (Operator op)   _ s h _ =
     case op of
         UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), length h]
         BinaryOp -> init (init $ init $ init $ init s) ++ [s!!(length s-3), length h]
-        _        -> let a = val (h!!(s!!(length s-1))) h
-                    in init (init $ init $ init $ init s) ++
-                      if (\(VAL Bool v) -> v) a == 1
-                      then [add2arg(s!!(length s-5)) h, s!!(length s-2)]
-                      else [add2arg(s!!(length s-6)) h, s!!(length s-2)]
+        _        -> let a = val (h!!last s) h
+                    in init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++
+                        case a of
+                            VAL Bool 1 -> [add2arg(s!!(length s-5)) h]
+                            VAL Bool _ -> [add2arg(s!!(length s-6)) h]
+                            _          -> throw (NoValueFound (show op ++ show a))
+
+                    --   if (\(VAL Bool v) -> v) a == 1
+                    --   then [add2arg(s!!(length s-5)) h, s!!(length s-2)]
+                    --   else [add2arg(s!!(length s-6)) h, s!!(length s-2)]
 stackf Alloc           _ s h _ = s ++ [length h]
 stackf (Updatelet _)   _ s h _ = init s
 stackf (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
@@ -687,22 +690,40 @@ stackf _               _ s _ _ = s -- Reset, Updatefun
 
 heapf :: Instruction -> [Int] -> [HeapCell] -> [HeapCell]
 heapf (Pushval t v) _ h = h ++ [VAL t v]
-heapf Makeapp       s h = h ++ [APP (s!!(length s-1))  (s!!(length s-2))]
+heapf Makeapp       s h = h ++ [APP (last s)  (s!!(length s-2))]
 heapf (Pushpre op)  _ h = h ++ [PRE op (arity op)]
-heapf Updateop      s h = insert1 (s!!(length s-1)) 0 h ++ [last h] ++ insert2 (s!!(length s-1)) h
-heapf (Updatefun f) s h = insert1 (s!!(length s-f-3)) 0 h ++ [IND (s!!(length s-1))] ++ insert2 (s!!(length s-f-3)) h
+heapf Updateop      s h = insert1 (s!!(length s-3)) 0 h ++ [h!!last s] ++ insert2 (s!!(length s-3)) h
+heapf (Updatefun f) s h = insert1 (s!!(length s-f-3)) 0 h ++ [IND (last s)] ++ insert2 (s!!(length s-f-3)) h
 heapf (Operator op) s h =
     case op of
         UnaryOp  -> let a = val (h!!(s!!(length s-3))) h
-                        b = val (h!!(s!!(length s-1))) h
-                    in h ++ [VAL ((\(VAL t _) -> t) b) ((\(VAL _ v) (PRE op _) -> compute op v 0) b a)]
+                        b = val (h!!last s) h
+                    in 
+                        case a of
+                            PRE op _ ->
+                                case b of
+                                    VAL t v -> h ++ [VAL t (compute op v 0)]
+                                    _ -> throw (NoValueFound (show b ++ show s ++ "1"))
+                            _        -> throw (NoValueFound (show a ++ show s ++ "2"))
+
+                        -- h ++ [VAL ((\(VAL t _) -> t) b) ((\(VAL _ v) (PRE op _) -> compute op v 0) b a)]
         BinaryOp -> let a = val (h!!(s!!(length s-4))) h
                         b = val (h!!(s!!(length s-2))) h
-                        c = val (h!!(s!!(length s-1))) h
-                    in h ++ [VAL (findType ((\(PRE op _) -> op) a)) ((\(VAL _ v1) (VAL _ v2) (PRE op _) -> compute op v1 v2) b c a)]
-        _        -> h
+                        c = val (h!!last s) h
+                    in 
+                        case a of
+                            PRE op _ ->
+                                case b of
+                                    VAL _ v1 ->
+                                        case c of
+                                            VAL _ v2 -> h ++ [VAL (findType op) (compute op v1 v2)]
+                                            _        -> throw (NoValueFound (show c ++ show s ++ "3"))
+                                    _        -> throw (NoValueFound (show b ++ show s ++ show h++ "4"))
+                            _ -> throw (NoValueFound (show c ++ show s ++ "5"))
+                        -- h ++ [VAL (findType ((\(PRE op _) -> op) a)) ((\(VAL _ v1) (VAL _ v2) (PRE op _) -> compute op v1 v2) b c a)]
+        _        -> h   -- stimmt das?
 heapf Alloc         _ h = h ++ [UNINITIALIZED]
-heapf (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (s!!(length s-1))] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
+heapf (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (last s)] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
 heapf _             _ h = h -- Pushfun, Reset, Pushparam, Slide, Unwind, Call, Return
 
 compute :: Token -> Value -> Value -> Value
@@ -732,7 +753,7 @@ insert1 adr akk h | adr > 0          = h!!akk : insert1 (adr-1) (akk+1) h
                   | otherwise        = []
 
 insert2 :: Int -> [HeapCell]-> [HeapCell]
-insert2 adr h   | adr < length h -1 = h!!(adr+1)  : insert2 (adr+1) h
+insert2 adr h   | adr < length h-1  = h!!(adr+1)  : insert2 (adr+1) h
                 | otherwise         = []
 
 arity :: Token -> Op
