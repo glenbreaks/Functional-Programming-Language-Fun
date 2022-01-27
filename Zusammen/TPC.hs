@@ -1,5 +1,6 @@
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
+import GHC.Float (int2Float)
 
 data CompilerException 
     = InvalidName !String
@@ -117,8 +118,8 @@ instance Show Instruction
           show (Slidelet i)       = "Slidelet " ++ show i
 
           
-data Type  = Int | Bool deriving (Eq, Show)  -- 1 = Bool, 0 = Zahl
-type Value = Int    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
+data Type  = Float | Bool deriving (Eq, Show)  -- 1 = Bool, 0 = Zahl
+type Value = Float    -- 0 = False, 1 = True oder jede andere Zahl falls Type 0
 
 data State = State
     {
@@ -539,7 +540,7 @@ compileExpr (Function           a  b)   env =
     case pos b env of
         Nothing -> compileExpr b env ++ compileExpr a env ++ [Makeapp]
         _       -> compileExpr b env ++ compileExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
-compileExpr (Val                a)      env = [Pushval Int a]
+compileExpr (Val                a)      env = [Pushval Float (int2Float a)]
 compileExpr (BoolVal            a)      env = [Pushval Bool x] -- x ist 0 oder 1  
     where x | a         = 1
             | not a     = 0
@@ -599,18 +600,21 @@ address arg ((x, y):xs)
     | otherwise = address arg xs
 address _ []    = throw WrongAddress
 
+-- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
 add2arg :: Int -> [HeapCell] -> Int
 add2arg adr h =
     case h!!adr of
         APP _ x -> x
         _       -> throw WrongAddress
         
+-- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
 typ :: Int -> [HeapCell] -> Type
 typ adr h =
     case h!!adr of
-        VAL Int _ -> Int
-        _         -> Bool
+        VAL Float _ -> Float
+        _              -> Bool
 
+-- liefert den Wert einer IND-Zelle an einer bestimmten Heap-Adresse
 val :: HeapCell -> [HeapCell] -> HeapCell
 val x h =
     case x of
@@ -729,7 +733,7 @@ compute :: Token -> Value -> Value -> Value
 compute Not      x _ | x == 0    = 1
                      | otherwise = 0
 compute Minus    x _ = - x
-compute DivBy    x _ = 1 `div` x
+compute DivBy    x _ = 1 / x
 
 compute LessThan x y | x < y     = 1
                      | otherwise = 0
@@ -743,8 +747,8 @@ slider n s akk | n > 0     = s!!akk : slider (n-1) s (akk+1)
                | otherwise = []
 
 findType :: Token -> Type
-findType Plus  = Int
-findType Times = Int
+findType Plus  = Float
+findType Times = Float
 findType _     = Bool
 
 insert1 :: Int -> Int -> [HeapCell] -> [HeapCell]
@@ -816,15 +820,6 @@ e15 = compile "f x = f x;"
 e16 = compile "f x y = f x y;"
 e17 = compile "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
 e18 = compile "main = f 3; f x = let y = 5, z = False in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
-h5 = VAL Bool 0  
-h4 = DEF "h" 1 3 
-h3 = VAL Int 2  
-h2 = DEF "g" 1 2 
-h1 = DEF "f" 1 1    
-h0 = VAL Int 1    
-l = [h0,h1,h2,h3,h4,h5]
-e19 = heapf Updateop  [1,2,3,4,5,2] l
-e20 = heapf (Updatefun 1) [1,2,3,4,5,2] l
 e21 = emulate "main = 1;" -- passt! <3
 e22 = run (State 0 ([Reset, Pushfun "main", Call, Halt]
                  ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return]
@@ -832,11 +827,5 @@ e22 = run (State 0 ([Reset, Pushfun "main", Call, Halt]
                  ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]
                  ++ [Pushfun "x", Updatefun 0, Slide 1, Unwind, Call, Return]) [] [DEF "f" 0 27] [("f", 0)]) -- emulate "f = x;" ausgeschrieben
 e23 = emulate "main = 1+2;"
-e24 = run (State 12 [Call, Halt,Halt, Halt, Halt] [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1] [("main", 0)])
--- wieso geht e24 nicht aber die drei folgenden schon:
-e241 = stackf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1] []
-e242 = heapf Call [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
-e243 = pcf Call 12 [3,5,4,3] [IND 5, VAL Int 2, VAL Int 1, PRE Plus BinaryOp, APP 3 2, APP 4 1]
-
 e25 = run (State 0 (startList ++ [Call, Halt]) [] [DEF "main" 0 27] [("main", 0)])
 -- call PRE funktioniert, aber danach gitb es ein Index Problem
