@@ -1,6 +1,5 @@
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
-import Graphics.Win32.GDI (sizeofLPBITMAPFILEHEADER)
 
 data CompilerException 
     = InvalidName !String
