@@ -132,10 +132,9 @@ data State = State
 
 instance Show State
     where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
-                                               ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
+                                            --    ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
                                                ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
                                                ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
-                                               ++ "\n\n\n>>> Result: "                                         ++ showResult (val(last heap) heap)
                                                ++ "\n\n"
             where
                 showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
@@ -160,12 +159,6 @@ instance Show State
                 showGlobal []                 = ""
                 indent 0                      = ""
                 indent n                      = " " ++ indent (n-1)
-                showResult x                  =
-                    case x of
-                        VAL Bool 1 -> show True
-                        VAL Bool _ -> show False
-                        VAL _    a -> show a
-                        _          -> show x
     
 type Stack  = [Int] -- speichert Adressen von auszuwertenden Ausdrücken (heap)
 type Heap   = [HeapCell]
@@ -510,10 +503,7 @@ startList = [Reset, Pushfun "main", Call, Halt]
 -------------
 
 compileDef :: Definition -> [Instruction]
-compileDef (Definition (Variable fun:args) body) = do
-    case body of
-        Variable x -> [Pushfun x, Updatefun n, Slide (n + 1), Unwind, Call, Return]
-        _          -> compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
+compileDef (Definition (Variable fun:args) body) = compileExpr body (posifyer args) ++ [Updatefun n, Slide (n + 1), Unwind, Call, Return]
     where
         n = length args
 
@@ -565,7 +555,7 @@ posifyerLet xs = posL xs n
         posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
         posL []                  n = []
 
----------- combining functions
+---------- combining functions:
 
 parse :: String -> Either String (Program, [Token])
 parse xs = program $ tokenize xs
@@ -577,15 +567,6 @@ compile xs =
         Left string              -> Left string
 
 ----------------- Emulator:
-
--- interprete :: Either String State -> Either String State
--- interprete xs = 
---     case xs of
---         Left xs     -> Left xs
---         Right s     -> return (hCode s)
-
--- run :: State -> State
--- run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = s{pc = pc+1, stack = (\s@State{stack = stack} -> stack) (hCode s)}
 
 ----------Hilfsfunktionen Interpreter ala Skript:
 
@@ -623,10 +604,10 @@ val x h =
 
 ---------------
 
-emulate :: String -> Either String State
+emulate :: String -> Either String Result
 emulate xs = 
     case compile xs of
-        Right x -> return (run x)
+        Right x -> return (result (run x))
         Left x  -> Left x
 
 run :: State -> State
@@ -682,10 +663,6 @@ stackf (Operator op)   _ s h _ =
                             VAL Bool 1 -> [add2arg(s!!(length s-5)) h]
                             VAL Bool _ -> [add2arg(s!!(length s-6)) h]
                             _          -> throw (NoValueFound (show op ++ show a))
-
-                    --   if (\(VAL Bool v) -> v) a == 1
-                    --   then [add2arg(s!!(length s-5)) h, s!!(length s-2)]
-                    --   else [add2arg(s!!(length s-6)) h, s!!(length s-2)]
 stackf Alloc           _ s h _ = s ++ [length h]
 stackf (Updatelet _)   _ s h _ = init s
 stackf (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
@@ -708,8 +685,6 @@ heapf (Operator op) s h =
                                     VAL t v -> h ++ [VAL t (compute op v 0)]
                                     _ -> throw (NoValueFound (show b ++ show s ++ "1"))
                             _        -> throw (NoValueFound (show a ++ show s ++ "2"))
-
-                        -- h ++ [VAL ((\(VAL t _) -> t) b) ((\(VAL _ v) (PRE op _) -> compute op v 0) b a)]
         BinaryOp -> let a = val (h!!(s!!(length s-4))) h
                         b = val (h!!(s!!(length s-2))) h
                         c = val (h!!last s) h
@@ -766,7 +741,21 @@ arity Minus = UnaryOp
 arity DivBy = UnaryOp
 arity _     = BinaryOp
 
----------- test examples
+---------- show function:
+newtype Result = Result HeapCell
+
+instance Show Result
+    where show (Result x) = "\n\n\n>>> Result: " ++
+            case x of
+                VAL Bool 1 -> show True  ++ "\n\n"
+                VAL Bool _ -> show False ++ "\n\n"
+                VAL _    a -> show a     ++ "\n\n"
+                _          -> show x     ++ "\n\n"
+
+result :: State -> Result
+result (State _ _ _ heap _) = Result (val (last heap) heap)
+
+---------- test examples:
 
 ex2 = posifyer [Variable "x", Variable "y"]
 ex3 = pos (Variable "x") ex2
