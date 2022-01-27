@@ -132,7 +132,7 @@ data State = State
 
 instance Show State
     where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
-                                            --    ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
+                                               ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
                                                ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
                                                ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
                                                ++ "\n\n"
@@ -190,7 +190,7 @@ data Op
 instance Show Op
     where show UnaryOp  = "1"
           show BinaryOp = "2"
-          show IfOp     = "if"
+          show IfOp     = "3"
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -584,14 +584,14 @@ address _ []    = throw WrongAddress
 -- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
 add2arg :: Int -> [HeapCell] -> Int
 add2arg adr h =
-    case h!!adr of
+    case val (h!!adr) h of
         APP _ x -> x
         _       -> throw WrongAddress
         
 -- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
 typ :: Int -> [HeapCell] -> Type
 typ adr h =
-    case h!!adr of
+    case val (h!!adr) h of
         VAL Float _ -> Float
         _              -> Bool
 
@@ -638,21 +638,21 @@ pcf _      p _ _ = p+1
 stackf :: Instruction -> Int -> [Int] -> [HeapCell] -> [(String, Int)] -> [Int]
 stackf (Pushfun arg)   _ s _ g = s ++ [address arg g]
 stackf (Pushval t v)   _ s h _ = s ++ [length h] -- new
-stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h] -- hier -3 da length s eins zu groß ist
-stackf Makeapp         _ s h _ = init (init s) ++ [length h] -- letztes stack element überschreiben (t-1 im skript)
+stackf (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h] -- s-arg-2!!
+stackf Makeapp         _ s h _ = init (init s) ++ [length h]
 stackf (Slide arg)     _ s _ _ = slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)]
 stackf Unwind          _ s h _ =
     case val (h!!last s) h of
         APP x _ -> s ++ [x]
         _       -> s
-stackf Call            p s h _ =        -- passt wir habens 100 mal getestet
+stackf Call            p s h _ =
     case val (h!!last s) h of
         DEF {}  -> s ++ [p+1]
         PRE _ _ -> s ++ [p+1]
         _       -> s
 stackf Return          _ s _ _ = init (init s) ++ [last s]
 stackf (Pushpre op)    _ s h _ = s ++ [length h]
-stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)] -- Diskrepanz zwischen Zhus NOtiz auf Seite 84 und Auswertung!) unseres ist nach Auswertung (heap[stack[T]] = last heap)
+stackf Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)]
 stackf (Operator op)   _ s h _ =
     case op of
         UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), length h]
@@ -698,8 +698,7 @@ heapf (Operator op) s h =
                                             _        -> throw (NoValueFound (show c ++ show s ++ "3"))
                                     _        -> throw (NoValueFound (show b ++ show s ++ show h++ "4"))
                             _ -> throw (NoValueFound (show c ++ show s ++ "5"))
-                        -- h ++ [VAL (findType ((\(PRE op _) -> op) a)) ((\(VAL _ v1) (VAL _ v2) (PRE op _) -> compute op v1 v2) b c a)]
-        _        -> h   -- stimmt das?
+        _        -> h
 heapf Alloc         _ h = h ++ [UNINITIALIZED]
 heapf (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (last s)] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
 heapf _             _ h = h -- Pushfun, Reset, Pushparam, Slide, Unwind, Call, Return
@@ -753,7 +752,7 @@ instance Show Result
                 _          -> show x     ++ "\n\n"
 
 result :: State -> Result
-result (State _ _ _ heap _) = Result (val (last heap) heap)
+result (State _ _ s h _) = Result (val (h!!last s) h)
 
 ---------- test examples:
 
