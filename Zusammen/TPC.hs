@@ -2,7 +2,7 @@ import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
 
-data CompilerException 
+data CompilerException
     = InvalidName !String
     | WrongAddress
     | NoValueFound !String
@@ -85,7 +85,7 @@ data Instruction
     | Updatelet Int
     | Slidelet Int
     deriving Eq
-    
+
 instance Show Instruction
     where show Reset              = "Reset"
           show (Pushfun fun)      = "Pushfun " ++ fun
@@ -117,7 +117,7 @@ instance Show Instruction
           show (Updatelet i)      = "Updatelet " ++ show i
           show (Slidelet i)       = "Slidelet " ++ show i
 
-          
+
 data Type  = Float | Bool deriving (Eq, Show)
 type Value = Float
 
@@ -159,12 +159,12 @@ instance Show State
                 showGlobal []                 = ""
                 indent 0                      = ""
                 indent n                      = " " ++ indent (n-1)
-    
+
 type Stack  = [Int]
 type Heap   = [HeapCell]
 type Global = [(String, Int)]
 
-data HeapCell 
+data HeapCell
     = APP Int Int
     | DEF String Int Int
     | VAL Type Value
@@ -251,44 +251,16 @@ tokenizer (x:xs) =
         "="     -> Equals        : tokenizer xs
         "true"  -> Boolean True  : tokenizer xs
         "false" -> Boolean False : tokenizer xs
-        _ | checkNumber x                   -> Number (read x) : tokenizer xs
-          | isAlpha (head x) && checkName x -> Name x          : tokenizer xs
-          | otherwise                       -> throw (InvalidName x)
+        _        | checkNumber x                   -> Number (read x) : tokenizer xs
+                 | isAlpha (head x) && checkName x -> Name x          : tokenizer xs
+                 | otherwise                       -> throw (InvalidName x)
 tokenizer []             = []
 
--- tokenizer ("|"     : xs) = Or            : tokenizer xs
--- tokenizer ("&"     : xs) = And           : tokenizer xs
--- tokenizer ("not"   : xs) = Not           : tokenizer xs
--- tokenizer ("<"     : xs) = LessThan      : tokenizer xs
--- tokenizer ("=="    : xs) = Is            : tokenizer xs
--- tokenizer ("-"     : xs) = Minus         : tokenizer xs
--- tokenizer ("+"     : xs) = Plus          : tokenizer xs
--- tokenizer ("/"     : xs) = DivBy         : tokenizer xs
--- tokenizer ("*"     : xs) = Times         : tokenizer xs
--- tokenizer ("("     : xs) = OpenPar       : tokenizer xs
--- tokenizer (")"     : xs) = ClosePar      : tokenizer xs
--- tokenizer ("let"   : xs) = Let           : tokenizer xs
--- tokenizer ("in"    : xs) = In            : tokenizer xs
--- tokenizer ("if"    : xs) = If            : tokenizer xs
--- tokenizer ("then"  : xs) = Then          : tokenizer xs
--- tokenizer ("else"  : xs) = Else          : tokenizer xs
--- tokenizer (";"     : xs) = Semicolon     : tokenizer xs
--- tokenizer (","     : xs) = Comma         : tokenizer xs
--- tokenizer ("="     : xs) = Equals        : tokenizer xs
--- tokenizer ("true"  : xs) = Boolean True  : tokenizer xs
--- tokenizer ("false" : xs) = Boolean False : tokenizer xs
--- tokenizer (x:xs)
---     | checkNumber x                   = Number (read x) : tokenizer xs
---     | isAlpha (head x) && checkName x = Name x          : tokenizer xs
---     | otherwise                       = throw (InvalidName x)
-
 checkNumber :: String -> Bool
-checkNumber (x:xs) = isDigit x && checkNumber xs
-checkNumber []     = True
+checkNumber = foldr ((&&) . isDigit) True
 
 checkName :: String -> Bool
-checkName (x:xs) = (isAlphaNum x || x == '_' || x == '\'') && checkName xs
-checkName []     = True
+checkName = foldr (\ x -> (&&) (isAlphaNum x || x == '_' || x == '\'')) True
 
 
 
@@ -420,7 +392,7 @@ parseAddExpr  xs1 = do
     (e, xs2)  <- parseMultExpr  xs1
     (es, xs3) <- parseRestAddExpr xs2
     return (foldl Sum e es, xs3)
-    
+
 parseRestAddExpr :: Parser [Expression]
 parseRestAddExpr (Plus : xs1)  = do
     (e, xs2)  <- parsePositiveMultExpr xs1
@@ -507,7 +479,7 @@ showDef (Definition (Variable a : _)_) = a
 ---------- Compiler:
 
 compile :: String -> Either String State
-compile xs = 
+compile xs =
     case parse xs of
         (Right (Program xs, [])) -> return (compileProgram xs)
         Left string              -> Left string
@@ -536,12 +508,12 @@ codeExpr (NotX               a)      env = codeExpr a env ++ [Pushpre Not, Makea
 codeExpr (Neg                a)      env = codeExpr a env ++ [Pushpre Minus, Makeapp]
 codeExpr (NegExpo            a)      env = codeExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
 codeExpr (OrX                a  b)   env = codeExpr (IfX a (BoolVal True) b)  env
-codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False)) env 
+codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False)) env
 codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
 codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
 codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-codeExpr (Function           a  b)   env = 
+codeExpr (Function           a  b)   env =
     case pos b env of
         Nothing -> codeExpr b env ++ codeExpr a env ++ [Makeapp]
         _       -> codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
@@ -549,7 +521,7 @@ codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
     where x | a         = 1
             | not a     = 0
-codeExpr (Variable           a)      env = 
+codeExpr (Variable           a)      env =
     case pos (Variable a) env of
         Nothing -> [Pushfun a]
         Just x  -> [Pushparam x]
@@ -573,13 +545,13 @@ initInstr = [Reset, Pushfun "main", Call, Halt]
 
 buildEnv :: [Expression] -> [(Expression, Int)]
 buildEnv xs = pos xs 1
-    where 
+    where
         pos [] _ = []
         pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
 
 buildEnvLet :: [LocDef] -> [(Expression, Int)]
 buildEnvLet xs = posL xs n
-    where 
+    where
         n = length xs
         posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
         posL []                  n = []
@@ -594,7 +566,7 @@ pos s ((x, i):xs) | s == x    = return i
 ----------------- Emulator:
 
 emulate :: String -> Either String Result
-emulate xs = 
+emulate xs =
     case compile xs of
         Right x -> return (result (run x))
         Left x  -> Left x
@@ -603,7 +575,7 @@ result :: State -> Result
 result (State _ _ s h _) = Result (val (h!!last s) h)
 
 run :: State -> State
-run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = 
+run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
     let i = code!!pc in
     if i /= Halt then run s { pc    = runPC i pc stack heap
                             , stack = runStack i pc stack heap global
@@ -616,7 +588,7 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
 -- g = global
 
 runPC :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
-runPC Unwind p s h = 
+runPC Unwind p s h =
     case val (h!!last s) h of
         APP _ _ -> p
         _       -> p+1
@@ -673,7 +645,7 @@ runHeap (Operator op) s h =
     case op of
         UnaryOp  -> let a = val (h!!(s!!(length s-3))) h
                         b = val (h!!last s) h
-                    in 
+                    in
                         case a of
                             PRE op _ ->
                                 case b of
@@ -683,7 +655,7 @@ runHeap (Operator op) s h =
         BinaryOp -> let a = val (h!!(s!!(length s-4))) h
                         b = val (h!!(s!!(length s-2))) h
                         c = val (h!!last s) h
-                    in 
+                    in
                         case a of
                             PRE op _ ->
                                 case b of
@@ -725,7 +697,7 @@ add2arg adr h =
     case val (h!!adr) h of
         APP _ x -> x
         _       -> throw WrongAddress
-        
+
 -- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
 typ :: Int -> [HeapCell] -> Type
 typ adr h =
