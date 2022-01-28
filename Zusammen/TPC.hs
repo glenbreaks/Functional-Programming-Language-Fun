@@ -741,6 +741,6 @@ arity _     = BinaryOp
 
 e1 = emulate "bool x = ((x == true) | (x == false)); f x = if bool x | x < 1 then 1 else x * f (x - 1); main = f 6;"
 e2 = emulate "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
-e3 = emulate "main = f 3; f x = let y = 5, z = False in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
+e3 = emulate "main = f 3; f x = let y = 5, z = false in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
 e4 = emulate "main = 1;"
 e5 = emulate "main = 1+2;"
