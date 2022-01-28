@@ -485,7 +485,7 @@ compile xs =
         Left string              -> Left string
 
 compileProgram :: [Definition] -> State
-compileProgram = foldl compileDef State{pc=0, code=initInstr, stack=[], heap=[], global=[]}
+compileProgram = foldl compileDef State{pc=0, code=initCode, stack=[], heap=[], global=[]}
   where
     compileDef s@State{code = code, heap = heap, global = global} def@(Definition (Variable fun:args) body) =
       s { code   = code ++ codeDef def
@@ -536,8 +536,8 @@ codeLocDefs x env = alloc n ++ cLocDefs x env n
 
 --- Hilfsfunktionen Compiler:
 
-initInstr :: [Instruction]
-initInstr = [Reset, Pushfun "main", Call, Halt]
+initCode :: [Instruction]
+initCode = [Reset, Pushfun "main", Call, Halt]
     ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return] --BinärOp
     ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]                  --If
     ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
