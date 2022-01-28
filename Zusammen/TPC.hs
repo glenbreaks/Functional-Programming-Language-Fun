@@ -502,7 +502,6 @@ codeExpr (LetX      (LocDefs a) b)   env = codeLocDefs a envLet ++ codeExpr b en
     where
         n = length a
         envLet = [(v, pos-1) | (v, pos) <- buildEnvLet a] ++ [(v, pos+n) | (v, pos) <- env]
-
 codeExpr (IfX                a  b c) env = codeExpr c env ++ codeExpr b [(v, pos+1) | (v, pos) <- env] ++ codeExpr a [(v, pos+2) | (v, pos) <- env] ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
 codeExpr (NotX               a)      env = codeExpr a env ++ [Pushpre Not, Makeapp]
 codeExpr (Neg                a)      env = codeExpr a env ++ [Pushpre Minus, Makeapp]
@@ -639,7 +638,7 @@ runHeap :: Instruction -> [Int] -> [HeapCell] -> [HeapCell]
 runHeap (Pushval t v) _ h = h ++ [VAL t v]
 runHeap Makeapp       s h = h ++ [APP (last s)  (s!!(length s-2))]
 runHeap (Pushpre op)  _ h = h ++ [PRE op (arity op)]
-runHeap Updateop      s h = insert1 (s!!(length s-3)) 0 h ++ [h!!last s] ++ insert2 (s!!(length s-3)) h
+runHeap Updateop      s h = insert1 (s!!(length s-3)) 0 h ++ [h!!last s] ++ insert2 (s!!(length s-3)) h -- val(h!!...) h??
 runHeap (Updatefun f) s h = insert1 (s!!(length s-f-3)) 0 h ++ [IND (last s)] ++ insert2 (s!!(length s-f-3)) h
 runHeap (Operator op) s h =
     case op of
