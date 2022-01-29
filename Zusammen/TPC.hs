@@ -1,6 +1,8 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
+import Distribution.Simple.Utils (xargs)
 
 data CompilerException
     = InvalidName !String
@@ -8,7 +10,7 @@ data CompilerException
     | NoValueFound !String
     | MissingMain
     | TypeCheck !String
-    | VariableNotInScope !String -- Nochmal checken, welche wir im Endeffekt wirklich brauchen
+    | VariableNotInScope !String 
     deriving Show
 
 instance Exception CompilerException
@@ -36,7 +38,32 @@ data Token
     | Semicolon
     | Comma
     | Equals
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Token
+    where 
+        show Or              = "|"
+        show And             = "&"
+        show Not             = "not"
+        show LessThan        = ">"
+        show Is              = "=="
+        show Minus           = "-"
+        show Plus            = "+"
+        show DivBy           = "/"
+        show OpenPar         = "("
+        show ClosePar        = ")"
+        show Let             = "let"
+        show In              = "in"
+        show If              = "if"
+        show Then            = "then"
+        show Else            = "else"
+        show Semicolon       = ";"
+        show Comma           = ","
+        show Equals          = "="
+        show (Boolean True)  = "true"
+        show (Boolean False) = "false"
+        show (Number x)      = show x 
+        show (Name   x)      = show x 
 
 data Expression
     = LetX      LocDefs Expression
@@ -110,12 +137,16 @@ instance Show Instruction
           show (Pushpre Not)      = "Pushpre not"
           show (Pushpre LessThan) = "Pushpre <"
           show (Pushpre Is)       = "Pushpre =="
+          show (Pushpre OpenPar)  = "Pushpre ("
+          show (Pushpre ClosePar) = "Pushpre )"
+          show (Pushpre x       ) = "Pushpre " ++ show x    -- x kann Number, Bool oder Name sein
           show (Updatefun i)      = "Update " ++ show i
           show Updateop           = "Update op"
           show (Operator o)       = "Operator " ++ show o
           show Alloc              = "Alloc"
           show (Updatelet i)      = "Updatelet " ++ show i
           show (Slidelet i)       = "Slidelet " ++ show i
+          
 
 
 data Type  = Float | Bool deriving (Eq, Show)
@@ -211,7 +242,7 @@ tokenize xs = tokenizer $ words $ spaceyfier xs
 spaceyfier :: String -> String
 spaceyfier x =
    case x of
-       ';' : xs       -> " ;"   ++ spaceyfier xs -- nach dem Strichounkt kein Leerzeichen, weil als Eingabe danach ein Leerzeichen oder Zeilenumbruch kommen MUSS!
+       ';' : xs       -> " ; "  ++ spaceyfier xs    -- nach dem Strichpunkt kein Leerzeichen, weil als Eingabe danach ein Leerzeichen oder Zeilenumbruch kommen MUSS!
        ',' : xs       -> " , "  ++ spaceyfier xs
        '|' : xs       -> " | "  ++ spaceyfier xs
        '&' : xs       -> " & "  ++ spaceyfier xs
@@ -254,14 +285,13 @@ tokenizer (x:xs) =
         _        | checkNumber x                   -> Number (read x) : tokenizer xs
                  | isAlpha (head x) && checkName x -> Name x          : tokenizer xs
                  | otherwise                       -> throw (InvalidName x)
-tokenizer []             = []
+tokenizer []             = []    
 
 checkNumber :: String -> Bool
 checkNumber = foldr ((&&) . isDigit) True
 
 checkName :: String -> Bool
 checkName = foldr (\ x -> (&&) (isAlphaNum x || x == '_' || x == '\'')) True
-
 
 
 ---------- Parser:
@@ -277,10 +307,9 @@ parseProgram xs1 = do
             (es, xs4) <- parseRestProgram xs3
             case xs4 of
                 []    -> return (Program (e:es), xs4)
-                (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler 
-                -- Hier die einzige Stelle an der Token bei einer Fehlermeldung einfach so ausgegeben werden, eventuell eine showToken Funktion implementieren, 
-                -- um immer schön anzeigen zu können wo die Fehler stattfinden. 
+                (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
         _               -> Left ("Semicolon expected after definition " ++ showDef e)
+
 
 parseRestProgram :: Parser [Definition]
 parseRestProgram xs1 = do
@@ -506,8 +535,8 @@ codeExpr (IfX                a  b c) env = codeExpr c env ++ codeExpr b [(v, pos
 codeExpr (NotX               a)      env = codeExpr a env ++ [Pushpre Not, Makeapp]
 codeExpr (Neg                a)      env = codeExpr a env ++ [Pushpre Minus, Makeapp]
 codeExpr (NegExpo            a)      env = codeExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
-codeExpr (OrX                a  b)   env = codeExpr (IfX a (BoolVal True) b)  env
-codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False)) env
+codeExpr (OrX                a  b)   env = codeExpr (IfX a   (BoolVal True) b)  env
+codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False))   env
 codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
 codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
@@ -575,11 +604,18 @@ result (State _ _ s h _) = Result (val (h!!last s) h)
 
 run :: State -> State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
+    if not (mainInGlobal global) then throw MissingMain else 
     let i = code!!pc in
     if i /= Halt then run s { pc    = runPC i pc stack heap
                             , stack = runStack i pc stack heap global
                             , heap  = runHeap i stack heap }
                  else s
+
+-- prüft, ob in Global eine main Funktion vorhanden ist                     
+mainInGlobal :: [([Char], b)] -> Bool
+mainInGlobal (("main",_):xs) = True 
+mainInGlobal (x:xs)          = mainInGlobal xs 
+mainInGlobal []              = False  
 
 -- p = pc
 -- s = stack
@@ -688,7 +724,7 @@ address :: String -> [(String, Int)] -> Int
 address arg ((x, y):xs)
     | x == arg  = y
     | otherwise = address arg xs
-address _ []    = throw WrongAddress
+address arg []    = throw (VariableNotInScope arg)     -- Fehler wird z.B. bei f a b = x; geworfen 
 
 -- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
 add2arg :: Int -> [HeapCell] -> Int
@@ -744,3 +780,11 @@ e2 = emulate "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"
 e3 = emulate "main = f 3; f x = let y = 5, z = false in if (y < x) == z then x / (y / 3) else f (x - 1); f = 1;"
 e4 = emulate "main = 1;"
 e5 = emulate "main = 1+2;"
+e6 = emulate "f x y = 1;main = e;" --passt -- VariableNotInScope e
+e7 = emulate "f x y = x + y;" --passt -- MissingMain
+e8 = emulate "f x y = c; main = f 3 4;"
+e9 = emulate "vector x y = (x y); main = vector 3 2;" -- Prelude.!!: negative index 
+e10 = emulate "id x = x; main = id 1;"
+e11 = emulate "vektorpr x y z w = x*z + y*w; main = vektorpr 1 2 3 4;"
+e12 = emulate "main = #;"
+e13 = emulate " main = 3; +" -- passt -- "parse error on input: +" 
