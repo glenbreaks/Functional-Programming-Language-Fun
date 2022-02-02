@@ -163,7 +163,7 @@ data State = State
 
 instance Show State
     where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
-                                               ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
+                                            --    ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
                                                ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
                                                ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
                                                ++ "\n\n"
