@@ -45,7 +45,7 @@ instance Show Token
         show Or              = "|"
         show And             = "&"
         show Not             = "not"
-        show LessThan        = ">"
+        show LessThan        = "<"
         show Is              = "=="
         show Minus           = "-"
         show Plus            = "+"
@@ -225,10 +225,10 @@ instance Show Op
 newtype Result = Result HeapCell
 
 instance Show Result
-    where show (Result x) = "\n\n\n>>> Result: " ++
+    where show (Result x) = "\n>>> Result: " ++
             case x of
-                VAL Bool 1 -> show True  ++ "\n\n"
-                VAL Bool _ -> show False ++ "\n\n"
+                VAL Bool 1 -> "true\n\n"
+                VAL Bool _ -> "false\n\n"
                 VAL _    a -> show a     ++ "\n\n"
                 _          -> show x     ++ "\n\n"
 
@@ -593,23 +593,49 @@ pos s ((x, i):xs) | s == x    = return i
 
 ----------------- Emulator:
 
-emulate :: String -> Either String Result
+emulate :: String -> IO() 
 emulate xs =
     case compile xs of
-        Right x -> return (result (run x))
-        Left x  -> Left x
+        Right x -> putStr $ show (result (run x))
+        Left x  -> putStr x
 
 result :: State -> Result
 result (State _ _ s h _) = Result (val (h!!last s) h)
 
-run :: State -> State
-run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
+showRun :: State -> [State]
+showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} = 
     if not (mainInGlobal global) then throw MissingMain else 
-    let i = code!!pc in
-    if i /= Halt then run s { pc    = runPC i pc stack heap
-                            , stack = runStack i pc stack heap global
-                            , heap  = runHeap i stack heap }
-                 else s
+        let i = code!!pc in
+            if i /= Halt then 
+                        s:showRun(s { pc    = runPC i pc stack heap
+                                 , stack = runStack i pc stack heap global
+                                 , heap  = runHeap i stack heap })
+                         else [s]
+
+showEmulate :: String -> Either String EmulatorState
+showEmulate xs = case compile xs of
+                    Left x -> putStr x 
+                    Right x -> return (EmulatorState (showRun x))
+
+newtype EmulatorState = EmulatorState [State] 
+
+instance Show EmulatorState
+    where show (EmulatorState ( s@State{pc = pc, code = code, stack = stack, heap = heap, global = global}:xs)) = 
+            if pc > 0 then 
+                "I: " ++ show(code!!(pc-1)) ++ "\nT: " ++ show(length stack-1) ++ "\nPC: c" ++ show pc 
+                ++ "\n" ++ show heap ++ "\n" ++  show (EmulatorState xs)
+            else "I: Reset\nT: -1\n PC: c1\n" ++ show heap ++ "\n" ++ show (EmulatorState xs) 
+          show (EmulatorState []) = ""
+
+run :: State -> State
+run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =  
+    if not (mainInGlobal global) then throw MissingMain else 
+        let i = code!!pc in
+            if i /= Halt then 
+                           run s { pc    = runPC i pc stack heap
+                                 , stack = runStack i pc stack heap global
+                                 , heap  = runHeap i stack heap }
+                         else s
 
 -- prüft, ob in Global eine main Funktion vorhanden ist                     
 mainInGlobal :: [([Char], b)] -> Bool
