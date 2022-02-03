@@ -2,7 +2,7 @@
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
-import Distribution.Simple.Utils (xargs)
+-- import Distribution.Simple.Utils (xargs)
 
 data CompilerException
     = InvalidName !String
@@ -39,31 +39,6 @@ data Token
     | Comma
     | Equals
     deriving Eq
-
-instance Show Token
-    where 
-        show Or              = "|"
-        show And             = "&"
-        show Not             = "not"
-        show LessThan        = "<"
-        show Is              = "=="
-        show Minus           = "-"
-        show Plus            = "+"
-        show DivBy           = "/"
-        show OpenPar         = "("
-        show ClosePar        = ")"
-        show Let             = "let"
-        show In              = "in"
-        show If              = "if"
-        show Then            = "then"
-        show Else            = "else"
-        show Semicolon       = ";"
-        show Comma           = ","
-        show Equals          = "="
-        show (Boolean True)  = "true"
-        show (Boolean False) = "false"
-        show (Number x)      = show x 
-        show (Name   x)      = show x 
 
 data Expression
     = LetX      LocDefs Expression
@@ -113,42 +88,6 @@ data Instruction
     | Slidelet Int
     deriving Eq
 
-instance Show Instruction
-    where show Reset              = "Reset"
-          show (Pushfun fun)      = "Pushfun " ++ fun
-          show (Pushval Bool v)
-                      | v == 0    = "Pushval Bool false"
-                      | otherwise = "Pushval Bool true"
-          show (Pushval t v)      = "Pushval " ++ show t ++ " " ++ show v
-          show (Pushparam i)      = "Pushparam " ++ show i
-          show Makeapp            = "Makeapp"
-          show (Slide i)          = "Slide " ++ show i
-          show Return             = "Return"
-          show Halt               = "Halt"
-          show Unwind             = "Unwind"
-          show Call               = "Call"
-          show (Pushpre If)       = "Pushpre if"
-          show (Pushpre Plus)     = "Pushpre +"
-          show (Pushpre Minus)    = "Pushpre -"
-          show (Pushpre Times)    = "Pushpre *"
-          show (Pushpre DivBy)    = "Pushpre 1/"
-          show (Pushpre Or)       = "Pushpre |"
-          show (Pushpre And)      = "Pushpre &"
-          show (Pushpre Not)      = "Pushpre not"
-          show (Pushpre LessThan) = "Pushpre <"
-          show (Pushpre Is)       = "Pushpre =="
-          show (Pushpre OpenPar)  = "Pushpre ("
-          show (Pushpre ClosePar) = "Pushpre )"
-          show (Pushpre x       ) = "Pushpre " ++ show x    -- x kann Number, Bool oder Name sein
-          show (Updatefun i)      = "Update " ++ show i
-          show Updateop           = "Update op"
-          show (Operator o)       = "Operator " ++ show o
-          show Alloc              = "Alloc"
-          show (Updatelet i)      = "Updatelet " ++ show i
-          show (Slidelet i)       = "Slidelet " ++ show i
-          
-
-
 data Type  = Float | Bool deriving (Eq, Show)
 type Value = Float
 
@@ -160,36 +99,6 @@ data State = State
         heap   :: Heap,
         global :: Global
     }
-
-instance Show State
-    where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
-                                            --    ++ "\n·········\n: Stack :\n·········\n"                        ++ showStack stack 0
-                                               ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 0
-                                               ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
-                                               ++ "\n\n"
-            where
-                showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
-                showCode (x:xs) 13            = "\n· if operation ·\nc13:  "     ++ show x ++ "\n" ++ showCode xs 14
-                showCode (x:xs) 21            = "\n· unary operation ·\nc21:  "  ++ show x ++ "\n" ++ showCode xs 22
-                showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
-                showCode (Return:xs) akk
-                    | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
-                    | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
-                showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
-                showCode [] _                 = ""
-                name n (x:xs)                 =
-                    case x of
-                        DEF f _ adr -> if n == adr then f else name n xs
-                        _           -> ""
-                name _ []                     = ""
-                showStack (x:xs) akk          = "s" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showStack xs (akk+1)
-                showStack [] _                = ""
-                showHeap (x:xs) akk           = "h" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showHeap xs (akk+1)
-                showHeap [] _                 = ""
-                showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
-                showGlobal []                 = ""
-                indent 0                      = ""
-                indent n                      = " " ++ indent (n-1)
 
 type Stack  = [Int]
 type Heap   = [HeapCell]
@@ -232,7 +141,118 @@ instance Show Result
                 VAL _    a -> show a     ++ "\n\n"
                 _          -> show x     ++ "\n\n"
 
+newtype EmulatorState = EmulatorState [State] 
 
+---------- Show-Funktionen:
+
+instance Show Token
+    where 
+        show Or              = "|"
+        show And             = "&"
+        show Not             = "not"
+        show LessThan        = "<"
+        show Is              = "=="
+        show Minus           = "-"
+        show Plus            = "+"
+        show DivBy           = "/"
+        show OpenPar         = "("
+        show ClosePar        = ")"
+        show Let             = "let"
+        show In              = "in"
+        show If              = "if"
+        show Then            = "then"
+        show Else            = "else"
+        show Semicolon       = ";"
+        show Comma           = ","
+        show Equals          = "="
+        show (Boolean True)  = "true"
+        show (Boolean False) = "false"
+        show (Number x)      = show x 
+        show (Name   x)      = show x 
+
+instance Show Instruction
+    where show Reset              = "Reset"
+          show (Pushfun fun)      = "Pushfun " ++ fun
+          show (Pushval Bool v)
+                      | v == 0    = "Pushval Bool false"
+                      | otherwise = "Pushval Bool true"
+          show (Pushval t v)      = "Pushval " ++ show t ++ " " ++ show v
+          show (Pushparam i)      = "Pushparam " ++ show i
+          show Makeapp            = "Makeapp"
+          show (Slide i)          = "Slide " ++ show i
+          show Return             = "Return"
+          show Halt               = "Halt"
+          show Unwind             = "Unwind"
+          show Call               = "Call"
+          show (Pushpre If)       = "Pushpre if"
+          show (Pushpre Plus)     = "Pushpre +"
+          show (Pushpre Minus)    = "Pushpre -"
+          show (Pushpre Times)    = "Pushpre *"
+          show (Pushpre DivBy)    = "Pushpre 1/"
+          show (Pushpre Or)       = "Pushpre |"
+          show (Pushpre And)      = "Pushpre &"
+          show (Pushpre Not)      = "Pushpre not"
+          show (Pushpre LessThan) = "Pushpre <"
+          show (Pushpre Is)       = "Pushpre =="
+          show (Pushpre OpenPar)  = "Pushpre ("
+          show (Pushpre ClosePar) = "Pushpre )"
+          show (Pushpre x       ) = "Pushpre " ++ show x    -- x kann Number, Bool oder Name sein
+          show (Updatefun i)      = "Update " ++ show i
+          show Updateop           = "Update op"
+          show (Operator o)       = "Operator " ++ show o
+          show Alloc              = "Alloc"
+          show (Updatelet i)      = "Updatelet " ++ show i
+          show (Slidelet i)       = "Slidelet " ++ show i
+
+instance Show State
+    where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 4
+                                               ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 4
+                                               ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
+                                               ++ "\n\n"
+            where
+                showCode (x:xs) 4             = "\n· binary operation ·\nc4:   " ++ show x ++ "\n" ++ showCode xs 5
+                showCode (x:xs) 13            = "\n· if operation ·\nc13:  "     ++ show x ++ "\n" ++ showCode xs 14
+                showCode (x:xs) 21            = "\n· unary operation ·\nc21:  "  ++ show x ++ "\n" ++ showCode xs 22
+                showCode [Return] akk         = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n"
+                showCode (Return:xs) akk
+                    | akk /= 12 && akk /=20   = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n\n· " ++ name (akk+1) heap ++ " ·\n" ++ showCode xs (akk+1)
+                    | otherwise               = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ "Return\n" ++ showCode xs (akk+1)
+                showCode (x:xs) akk           = "c" ++ show akk ++ ":" ++ indent (4 - length (show akk)) ++ show x ++ "\n" ++ showCode xs (akk+1)
+                showCode [] _                 = ""
+                name n (x:xs)                 =
+                    case x of
+                        DEF f _ adr -> if n == adr then f else name n xs
+                        _           -> ""
+                name _ []                     = ""
+                showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
+                showGlobal []                 = ""
+
+instance Show EmulatorState
+    where show (EmulatorState (State pc code stack heap _:xs)) = if pc > 0
+                                                                 then "I:  " ++ show(code!!(pc-1)) ++ "\n\nT:  " ++ show(length stack-1) ++ "\nPC: c" ++ show pc 
+                                                                            ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
+                                                                            ++ "\n" ++ "--------------\n\n" ++ show (EmulatorState xs)
+                                                                 else "\nI:  Reset\n\nT:  -1\nPC: c1\n\n" ++ showHeap heap 2 ++ "\n"
+                                                                            ++ "--------------\n\n" ++ show (EmulatorState xs)
+          show (EmulatorState []) = ""
+
+showStack :: [Int] -> Int -> [Char]
+showStack [] _ = ""
+showStack xs n = hshowStack xs n 0
+    where hshowStack (x:xs) n akk = "s" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowStack xs n (akk+1)
+          hshowStack []     _ _   = ""
+
+showHeap :: [HeapCell] -> Int -> [Char]
+showHeap [] _ = ""
+showHeap xs n = hshowHeap xs n 0
+    where hshowHeap (x:xs) n akk = "h" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowHeap xs n (akk+1)
+          hshowHeap []     _ _   = ""
+
+showInstr 
+
+indent :: Int -> String
+indent 0                      = ""
+indent n                      = " " ++ indent (n-1)
 
 ---------- Tokenizer:
 
@@ -612,20 +632,10 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                                  , heap  = runHeap i stack heap })
                          else [s]
 
-showEmulate :: String -> Either String EmulatorState
+showEmulate :: String -> IO()
 showEmulate xs = case compile xs of
-                    Left x -> putStr x 
-                    Right x -> return (EmulatorState (showRun x))
-
-newtype EmulatorState = EmulatorState [State] 
-
-instance Show EmulatorState
-    where show (EmulatorState ( s@State{pc = pc, code = code, stack = stack, heap = heap, global = global}:xs)) = 
-            if pc > 0 then 
-                "I: " ++ show(code!!(pc-1)) ++ "\nT: " ++ show(length stack-1) ++ "\nPC: c" ++ show pc 
-                ++ "\n" ++ show heap ++ "\n" ++  show (EmulatorState xs)
-            else "I: Reset\nT: -1\n PC: c1\n" ++ show heap ++ "\n" ++ show (EmulatorState xs) 
-          show (EmulatorState []) = ""
+                    Left x -> putStr x
+                    Right x -> putStr $ show (EmulatorState (showRun x))
 
 run :: State -> State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =  
