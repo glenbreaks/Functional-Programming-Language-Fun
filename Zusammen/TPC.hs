@@ -112,34 +112,13 @@ data HeapCell
     | PRE Token Op
     | UNINITIALIZED
 
-instance Show HeapCell
-    where show (APP a b  )   = "APP " ++ show a ++ " " ++ show b
-          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " " ++ show y
-          show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
-          show (IND x    )   = "IND " ++ show x
-          show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
-          show UNINITIALIZED = ""
-
 data Op
     = UnaryOp
     | BinaryOp
     | IfOp
     deriving Eq
 
-instance Show Op
-    where show UnaryOp  = "1"
-          show BinaryOp = "2"
-          show IfOp     = "3"
-
 newtype Result = Result HeapCell
-
-instance Show Result
-    where show (Result x) = "\n>>> Result: " ++
-            case x of
-                VAL Bool 1 -> "true\n\n"
-                VAL Bool _ -> "false\n\n"
-                VAL _    a -> show a     ++ "\n\n"
-                _          -> show x     ++ "\n\n"
 
 newtype EmulatorState = EmulatorState [State] 
 
@@ -227,13 +206,40 @@ instance Show State
                 showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
                 showGlobal []                 = ""
 
+instance Show HeapCell
+    where show (APP a b  )   = "APP " ++ show a ++ " " ++ show b
+          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " " ++ show y
+          show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
+          show (IND x    )   = "IND " ++ show x
+          show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
+          show UNINITIALIZED = ""
+
+instance Show Op
+    where show UnaryOp  = "1"
+          show BinaryOp = "2"
+          show IfOp     = "3"
+
+instance Show Result
+    where show (Result x) = "\n>>> Result: " ++
+            case x of
+                VAL Bool 1 -> "true\n\n"
+                VAL Bool _ -> "false\n\n"
+                VAL _    a -> show a     ++ "\n\n"
+                _          -> show x     ++ "\n\n"
+
 instance Show EmulatorState
-    where show (EmulatorState (State pc code stack heap _:xs)) = if pc > 0
-                                                                 then "I:  " ++ show(code!!(pc-1)) ++ "\n\nT:  " ++ show(length stack-1) ++ "\nPC: c" ++ show pc 
-                                                                            ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
-                                                                            ++ "\n" ++ "--------------\n\n" ++ show (EmulatorState xs)
-                                                                 else "\nI:  Reset\n\nT:  -1\nPC: c1\n\n" ++ showHeap heap 2 ++ "\n"
-                                                                            ++ "--------------\n\n" ++ show (EmulatorState xs)
+    where show (EmulatorState (State pc code stack heap global:xs)) = if pc > -1
+            then
+                let i = code!!pc in
+                    case i of Halt -> showInstr (show i) ++ "\n\nT:  "
+                                ++ show (length stack-1) ++ "\nPC: c" ++ show pc 
+                                ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
+                                ++ "\n--------------\n\n" ++ show (result (State pc code stack heap global))
+                              _    -> showInstr (show i) ++ "\n\nT:  "
+                                ++ show (length stack-1) ++ "\nPC: c" ++ show pc 
+                                ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
+                                ++ "\n--------------\n\n" ++ show (EmulatorState xs)
+            else ""
           show (EmulatorState []) = ""
 
 showStack :: [Int] -> Int -> [Char]
@@ -248,8 +254,11 @@ showHeap xs n = hshowHeap xs n 0
     where hshowHeap (x:xs) n akk = "h" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowHeap xs n (akk+1)
           hshowHeap []     _ _   = ""
 
-showInstr 
-
+showInstr :: String -> String
+showInstr xs = dots (length xs+4) ++ "\n: " ++ xs ++ " :\n" ++ dots (length xs+4)
+    where dots 0 = ""
+          dots n = "·" ++ dots (n-1)
+          
 indent :: Int -> String
 indent 0                      = ""
 indent n                      = " " ++ indent (n-1)
