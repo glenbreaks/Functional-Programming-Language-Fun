@@ -2,7 +2,6 @@
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
--- import Distribution.Simple.Utils (xargs)
 
 data CompilerException
     = InvalidName !String
