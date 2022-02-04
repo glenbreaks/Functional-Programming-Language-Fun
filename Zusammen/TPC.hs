@@ -39,6 +39,14 @@ data Token
     | Equals
     deriving Eq
 
+newtype Program = Program [Definition] deriving Show
+
+data Definition = Definition [Expression] Expression deriving Show
+
+newtype LocDefs = LocDefs [LocDef] deriving (Eq, Show)
+
+data LocDef     = LocDef Expression Expression deriving (Eq, Show)
+
 data Expression
     = LetX      LocDefs Expression
     | IfX       Expression Expression Expression
@@ -56,14 +64,6 @@ data Expression
     | BoolVal   Bool
     | Variable  String
     deriving (Eq, Show)
-
-newtype Program = Program [Definition] deriving Show
-
-data Definition = Definition [Expression] Expression deriving Show
-
-newtype LocDefs = LocDefs [LocDef] deriving (Eq, Show)
-
-data LocDef     = LocDef Expression Expression deriving (Eq, Show)
 
 type Parser a = [Token] -> Either String (a, [Token])
 
