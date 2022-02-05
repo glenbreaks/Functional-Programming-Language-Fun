@@ -631,22 +631,6 @@ emulate xs =
 result :: State -> Result
 result (State _ _ s h _) = Result (val (h!!last s) h)
 
-showRun :: State -> [State]
-showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
-    if not (mainInGlobal global) then throw MissingMain else
-        let i = code!!pc in
-            if i /= Halt then
-                    s:showRun(s { pc    = runPC i pc stack heap
-                                      , stack = runStack i pc stack heap global
-                                      , heap  = runHeap i stack heap })
-                         else [s]
-
-showEmulate :: String -> IO()
-showEmulate xs = case compile xs of
-                    Left x -> putStr x
-                    Right x -> putStr $ show (EmulatorState (showRun x))
-
-
 run :: State -> State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
     if not (mainInGlobal global) then throw MissingMain else
@@ -656,12 +640,6 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
                                  , stack = runStack i pc stack heap global
                                  , heap  = runHeap i stack heap }
                          else s
-
--- prüft, ob in Global eine main Funktion vorhanden ist                     
-mainInGlobal :: [([Char], b)] -> Bool
-mainInGlobal (("main",_):xs) = True
-mainInGlobal (x:xs)          = mainInGlobal xs
-mainInGlobal []              = False
 
 -- p = pc
 -- s = stack
@@ -801,6 +779,12 @@ findType :: Token -> Type
 findType Plus  = Float
 findType Times = Float
 findType _     = Bool
+
+-- prüft, ob in Global eine main Funktion vorhanden ist                     
+mainInGlobal :: [([Char], b)] -> Bool
+mainInGlobal (("main",_):xs) = True
+mainInGlobal (x:xs)          = mainInGlobal xs
+mainInGlobal []              = False
 
 insert1 :: Int -> Int -> [HeapCell] -> [HeapCell]
 insert1 adr akk h | adr > 0          = h!!akk : insert1 (adr-1) (akk+1) h
