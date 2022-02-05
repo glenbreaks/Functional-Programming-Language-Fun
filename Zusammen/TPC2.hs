@@ -261,29 +261,39 @@ indent 0                      = ""
 indent n                      = " " ++ indent (n-1)
 
 columns :: Int -> [String] -> [HeapCell] -> String
-columns pc (s:stack) (h:heap) = "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))
-                                       ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
-                                       ++ "h0: "++ indent 2 ++ show h ++ indent (15-length (show h))
+columns pc stack (h:heap) =
+    case stack of
+        (s:stack)  -> "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))
+                                   ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
+                                   ++ "h0: "++ indent 2 ++ show h
                              ++ "\n" ++ hcolumns 1 [pc] stack heap
-    where hcolumns akk (x:xs) (y:ys) (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
-                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
-                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
-                                           ++ "\n" ++ hcolumns (akk+1) xs ys zs
-          hcolumns akk []     (y:ys) (z:zs) = indent 19 
+        _          -> "T:  " ++ show (length stack-1) ++ indent 15
+                            ++ indent 21 --    ++ "s0: " ++ indent 2 ++ s ++ indent (15-length stack)
+                            ++ "h0: "++ indent 2 ++ show h
+                ++ "\n" ++ hcolumns 1 [pc] stack heap
+    where hcolumns akk [x] (y:ys) (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
                                            ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] ys zs
-          hcolumns akk []     (y:ys) []     = indent 19 
-                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y
+          hcolumns akk [x] (y:ys) []     = "PC: " ++ show x ++ indent (15-length (show x))
+                                           ++  "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y
                                            ++ "\n" ++ hcolumns (akk+1) [] ys []
-          hcolumns akk []     []     (z:zs) = indent 40
-                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
-                                           ++ "\n" ++ hcolumns (akk+1) [] [] zs
-          hcolumns akk []     []     []     = ""
-          hcolumns akk (x:xs) []     (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
+          hcolumns akk [x] []     (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
                                            ++ indent 21
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
-                                           ++ "\n" ++ hcolumns (akk+1) xs [] zs
+                                           ++ "\n" ++ hcolumns (akk+1) [] [] zs
+          hcolumns akk [x] []     []     = "PC: " ++ show x ++ indent (15-length (show x)) ++ "\n"
+          hcolumns akk []  (y:ys) (z:zs) = indent 19 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) [] ys zs
+          hcolumns akk []  (y:ys) []     = indent 19 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y
+                                           ++ "\n" ++ hcolumns (akk+1) [] ys []
+          hcolumns akk []  []     (z:zs) = indent 40
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) [] [] zs
+          hcolumns _   _   _      _      = ""
 columns _ _ _ = ""
 
 
@@ -609,10 +619,7 @@ codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a  [(v, po
 codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
 codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-codeExpr (Function           a  b)   env =
-    case pos b env of
-        Nothing -> codeExpr b env ++ codeExpr a env ++ [Makeapp]
-        _       -> codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
+codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
     where x | a         = 1
@@ -876,3 +883,4 @@ e10 = emulate "id x = x; main = id 1;"
 e11 = emulate "vektorpr x y z w = x*z + y*w; main = vektorpr 1 2 3 4;"
 e12 = emulate "main = #;"
 e13 = emulate " main = 3; +" -- passt -- "parse error on input: +" 
+e14 = emulate "main = quadratwurzel 2; quadratwurzel x = 1 + qw x 1000; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
