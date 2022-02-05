@@ -99,7 +99,7 @@ data State = State
         global :: Global
     }
 
-type Stack  = [Int]
+type Stack  = [String]
 type Heap   = [HeapCell]
 type Global = [(String, Int)]
 
@@ -133,6 +133,7 @@ instance Show Token
         show Minus           = "-"
         show Plus            = "+"
         show DivBy           = "/"
+        show Times           = "*"
         show OpenPar         = "("
         show ClosePar        = ")"
         show Let             = "let"
@@ -206,10 +207,10 @@ instance Show State
                 showGlobal []                 = ""
 
 instance Show HeapCell
-    where show (APP a b  )   = "APP " ++ show a ++ " " ++ show b
-          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " " ++ show y
+    where show (APP a b  )   = "APP h" ++ show a ++ " h" ++ show b
+          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " c" ++ show y
           show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
-          show (IND x    )   = "IND " ++ show x
+          show (IND x    )   = "IND h" ++ show x
           show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
           show UNINITIALIZED = ""
 
@@ -241,13 +242,13 @@ instance Show EmulatorState
           show (EmulatorState _) = ""
 
 
-showStack :: [Int] -> Int -> [Char]
+showStack :: [String] -> Int -> String
 showStack [] _ = ""
 showStack xs n = hshowStack xs n 0
-    where hshowStack (x:xs) n akk = "s" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowStack xs n (akk+1)
+    where hshowStack (x:xs) n akk = "s" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ x ++ "\n" ++ hshowStack xs n (akk+1)
           hshowStack []     _ _   = ""
 
-showHeap :: [HeapCell] -> Int -> [Char]
+showHeap :: [HeapCell] -> Int -> String
 showHeap [] _ = ""
 showHeap xs n = hshowHeap xs n 0
     where hshowHeap (x:xs) n akk = "h" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowHeap xs n (akk+1)
@@ -621,6 +622,9 @@ pos s ((x, i):xs) | s == x    = return i
 
 ----------------- Emulator:
 
+getAddress :: String -> Int
+getAddress xs = read (tail xs) :: Int
+
 emulate :: String -> IO()
 emulate xs =
     case compile xs of
@@ -628,7 +632,7 @@ emulate xs =
         Left x  -> putStr x
 
 result :: State -> Result
-result (State _ _ s h _) = Result (val (h!!last s) h)
+result (State _ _ s h _) = Result (val (h!!getAddress (last s)) h)
 
 showRun :: State -> [State]
 showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
@@ -636,8 +640,8 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
         let i = code!!pc in
             if i /= Halt then
                     s:showRun(s { pc    = runPC i pc stack heap
-                                      , stack = runStack i pc stack heap global
-                                      , heap  = runHeap i stack heap })
+                                , stack = runStack i pc stack heap global
+                                , heap  = runHeap i stack heap })
                          else [s]
 
 showEmulate :: String -> IO()
@@ -667,64 +671,64 @@ mainInGlobal []              = False
 -- h = heap
 -- g = global
 
-runPC :: Instruction -> Int -> [Int] -> [HeapCell] -> Int
+runPC :: Instruction -> Int -> [String] -> [HeapCell] -> Int
 runPC Unwind p s h =
-    case val (h!!last s) h of
+    case val (h!!getAddress (last s)) h of
         APP _ _ -> p
         _       -> p+1
 runPC Call   p s h =
-    case val (h!!last s) h of
+    case val (h!!getAddress (last s)) h of
         DEF _ _ adr    -> adr
         PRE _ BinaryOp -> 4
         PRE _ IfOp     -> 13
         PRE _ UnaryOp  -> 21
         _              -> p+1
-runPC Return p s _ = s!!(length s-2)
+runPC Return p s _ = getAddress (s!!(length s-2))
 runPC _      p _ _ = p+1
 
-runStack :: Instruction -> Int -> [Int] -> [HeapCell] -> [(String, Int)] -> [Int]
-runStack (Pushfun arg)   _ s _ g = s ++ [address arg g]
-runStack (Pushval t v)   _ s h _ = s ++ [length h] -- new
-runStack (Pushparam arg) _ s h _ = s ++ [add2arg (s!!(length s-arg-2)) h]
-runStack Makeapp         _ s h _ = init (init s) ++ [length h]
+runStack :: Instruction -> Int -> [String] -> [HeapCell] -> [(String, Int)] -> [String]
+runStack (Pushfun arg)   _ s _ g = s ++ ["h" ++ show (address arg g)]
+runStack (Pushval t v)   _ s h _ = s ++ ["h" ++ show (length h)] -- new
+runStack (Pushparam arg) _ s h _ = s ++ ["h" ++ show (add2arg (s!!(length s-arg-2)) h)]
+runStack Makeapp         _ s h _ = init (init s) ++ ["h" ++ show (length h)]
 runStack (Slide arg)     _ s _ _ = slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)]
 runStack Unwind          _ s h _ =
-    case val (h!!last s) h of
-        APP x _ -> s ++ [x]
+    case val (h!!getAddress (last s)) h of
+        APP x _ -> s ++ ["h" ++ show x]
         _       -> s
 runStack Call            p s h _ =
-    case val (h!!last s) h of
-        DEF {}  -> s ++ [p+1]
-        PRE _ _ -> s ++ [p+1]
+    case val (h!!getAddress (last s)) h of
+        DEF {}  -> s ++ ["c" ++ show (p+1)]
+        PRE _ _ -> s ++ ["c" ++ show (p+1)]
         _       -> s
 runStack Return          _ s _ _ = init (init s) ++ [last s]
-runStack (Pushpre op)    _ s h _ = s ++ [length h]
+runStack (Pushpre op)    _ s h _ = s ++ ["h" ++ show (length h)]
 runStack Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)]
 runStack (Operator op)   _ s h _ =
     case op of
-        UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), length h]
-        BinaryOp -> init (init $ init $ init $ init s) ++ [s!!(length s-3), length h]
-        _        -> let a = val (h!!last s) h
+        UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), "h" ++ show (length h)]
+        BinaryOp -> init (init $ init $ init $ init s) ++ [s!!(length s-3), "h" ++ show (length h)]
+        _        -> let a = val (h!!getAddress (last s)) h
                     in init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++
                         case a of
-                            VAL Bool 1 -> [add2arg(s!!(length s-5)) h]
-                            VAL Bool _ -> [add2arg(s!!(length s-6)) h]
+                            VAL Bool 1 -> ["h" ++ show (add2arg(s!!(length s-5)) h)]
+                            VAL Bool _ -> ["h" ++ show (add2arg(s!!(length s-6)) h)]
                             _          -> throw (NoValueFound (show op ++ show a))
-runStack Alloc           _ s h _ = s ++ [length h]
+runStack Alloc           _ s h _ = s ++ ["h" ++ show (length h)]
 runStack (Updatelet _)   _ s h _ = init s
 runStack (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
 runStack _               _ s _ _ = s
 
-runHeap :: Instruction -> [Int] -> [HeapCell] -> [HeapCell]
+runHeap :: Instruction -> [String] -> [HeapCell] -> [HeapCell]
 runHeap (Pushval t v) _ h = h ++ [VAL t v]
-runHeap Makeapp       s h = h ++ [APP (last s)  (s!!(length s-2))]
+runHeap Makeapp       s h = h ++ [APP (getAddress (last s))  (getAddress (s!!(length s-2)))]
 runHeap (Pushpre op)  _ h = h ++ [PRE op (arity op)]
-runHeap Updateop      s h = insert1 (s!!(length s-3)) 0 h ++ [h!!last s] ++ insert2 (s!!(length s-3)) h -- val(h!!...) h??
-runHeap (Updatefun f) s h = insert1 (s!!(length s-f-3)) 0 h ++ [IND (last s)] ++ insert2 (s!!(length s-f-3)) h
+runHeap Updateop      s h = insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h -- val(h!!...) h??
+runHeap (Updatefun f) s h = insert1 (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insert2 (getAddress (s!!(length s-f-3))) h
 runHeap (Operator op) s h =
     case op of
-        UnaryOp  -> let a = val (h!!(s!!(length s-3))) h
-                        b = val (h!!last s) h
+        UnaryOp  -> let a = val (h!!getAddress (s!!(length s-3))) h
+                        b = val (h!!getAddress (last s)) h
                     in
                         case a of
                             PRE op _ ->
@@ -732,9 +736,9 @@ runHeap (Operator op) s h =
                                     VAL t v -> h ++ [VAL t (compute op v 0)]
                                     _       -> throw (NoValueFound (show b ++ show s ++ "1"))
                             _        -> throw (NoValueFound (show a ++ show s ++ "2"))
-        BinaryOp -> let a = val (h!!(s!!(length s-4))) h
-                        b = val (h!!(s!!(length s-2))) h
-                        c = val (h!!last s) h
+        BinaryOp -> let a = val (h!!getAddress (s!!(length s-4))) h
+                        b = val (h!!getAddress (s!!(length s-2))) h
+                        c = val (h!!getAddress (last s)) h
                     in
                         case a of
                             PRE op _ ->
@@ -747,7 +751,7 @@ runHeap (Operator op) s h =
                             _ -> throw (NoValueFound (show c ++ show s ++ "5"))
         _        -> h
 runHeap Alloc         _ h = h ++ [UNINITIALIZED]
-runHeap (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (last s)] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
+runHeap (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (getAddress (last s))] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
 runHeap _             _ h = h
 
 compute :: Token -> Value -> Value -> Value
@@ -772,9 +776,9 @@ address arg ((x, y):xs)
 address arg []    = throw (VariableNotInScope arg)     -- Fehler wird z.B. bei f a b = x; geworfen 
 
 -- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
-add2arg :: Int -> [HeapCell] -> Int
+add2arg :: String -> [HeapCell] -> Int
 add2arg adr h =
-    case val (h!!adr) h of
+    case val (h!!getAddress adr) h of
         APP _ x -> x
         _       -> throw WrongAddress
 
@@ -792,7 +796,7 @@ val x h =
         IND adr -> val (h!!adr) h
         _       -> x
 
-slider :: Int -> [Int] -> Int -> [Int]
+slider :: Int -> [String] -> Int -> [String]
 slider n s akk | n > 0     = s!!akk : slider (n-1) s (akk+1)
                | otherwise = []
 

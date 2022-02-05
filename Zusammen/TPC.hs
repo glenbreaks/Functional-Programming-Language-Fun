@@ -133,6 +133,7 @@ instance Show Token
         show Minus           = "-"
         show Plus            = "+"
         show DivBy           = "/"
+        show Times           = "*"
         show OpenPar         = "("
         show ClosePar        = ")"
         show Let             = "let"
