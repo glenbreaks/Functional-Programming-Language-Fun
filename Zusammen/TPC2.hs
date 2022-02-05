@@ -41,7 +41,7 @@ data Token
 
 newtype Program = Program [Definition] deriving Show
 
-data Definition = Definition [Expression] Expression deriving Show
+data Definition = Definition [Expression] Expression
 
 newtype LocDefs = LocDefs [LocDef] deriving (Eq, Show)
 
@@ -147,7 +147,12 @@ instance Show Token
         show (Boolean True)  = "true"
         show (Boolean False) = "false"
         show (Number x)      = show x
-        show (Name   x)      = show x
+        show (Name   x)      = x
+
+instance Show Definition
+    where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (15-length fun) ++ show (hshowArgs args) ++ indent (10-length (show (hshowArgs args))) ++ "(" ++ show expr ++ ")"
+           where hshowArgs ((Variable x):xs) = x:hshowArgs xs
+                 hshowArgs []                = []
 
 instance Show Instruction
     where show Reset              = "Reset"
@@ -228,18 +233,11 @@ instance Show Result
                 _          -> show x     ++ "\n\n"
 
 instance Show EmulatorState
-    where
-        show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
-            let i = code!!pc1 in
-                showInstr (show i) ++ "\n\nT:  "
-                                   ++ show (length stack-1) ++ indent (4-length (show (length stack-1)) ++ columns pc2 stack heap
-                                   ++ show (EmulatorState (s2:xs))
-        show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
-                showInstr (show (code!!pc)) ++ "\n\nT:  "
-                                   ++ show (length stack-1)
-                                   ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
-                                   ++ show (result s)
-        show (EmulatorState _) = ""
+    where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
+                showBoxed (show (code!!pc1)) ++ "\n\n" ++ columns pc2 stack heap ++ show (EmulatorState (s2:xs))
+          show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
+                showBoxed (show (code!!pc))  ++ "\n\n" ++ show (result s)
+          show (EmulatorState _) = ""
 
 showStack :: [String] -> Int -> String
 showStack [] _ = ""
@@ -253,8 +251,8 @@ showHeap xs n = hshowHeap xs n 0
     where hshowHeap (x:xs) n akk = "h" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowHeap xs n (akk+1)
           hshowHeap []     _ _   = ""
 
-showInstr :: String -> String
-showInstr xs = "\n" ++ dots (length xs+4) ++ "\n: " ++ xs ++ " :\n" ++ dots (length xs+4)
+showBoxed :: String -> String
+showBoxed xs = "\n" ++ dots (length xs+4) ++ "\n: " ++ xs ++ " :\n" ++ dots (length xs+4)
     where dots 0 = ""
           dots n = "·" ++ dots (n-1)
 
@@ -263,24 +261,39 @@ indent 0                      = ""
 indent n                      = " " ++ indent (n-1)
 
 columns :: Int -> [String] -> [HeapCell] -> String
-columns pc = hcolumns 0 [pc]
-    where hcolumns akk (x:xs) (y:ys) (z:zs) = "PC: " ++ show x ++ indent (20-length (show x))
-                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y ++ indent (20-length (show y))
+columns pc (s:stack) (h:heap) = "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))
+                                       ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
+                                       ++ "h0: "++ indent 2 ++ show h ++ indent (15-length (show h))
+                             ++ "\n" ++ hcolumns 1 [pc] stack heap
+    where hcolumns akk (x:xs) (y:ys) (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) xs ys zs
-          hcolumns akk []     (y:ys) (z:zs) = indent 24 
-                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y ++ indent (20-length (show y))
+          hcolumns akk []     (y:ys) (z:zs) = indent 19 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] ys zs
-          hcolumns akk []     (y:ys) []     = indent 24 
-                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y
+          hcolumns akk []     (y:ys) []     = indent 19 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y
                                            ++ "\n" ++ hcolumns (akk+1) [] ys []
-          hcolumns akk []     []     (z:zs) = indent 50
+          hcolumns akk []     []     (z:zs) = indent 40
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] [] zs
           hcolumns akk []     []     []     = ""
+          hcolumns akk (x:xs) []     (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
+                                           ++ indent 21
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) xs [] zs
+columns _ _ _ = ""
+
 
 ---------- Tokenizer:
+
+showTokens :: String -> IO() -- just for output
+showTokens xs = let ys = tokenize xs in
+    putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokens ys ++ "\n"
+        where hshowTokens (x:xs) = show x ++ "\n" ++ hshowTokens xs
+              hshowTokens []     = ""
 
 tokenize :: String -> [Token]
 tokenize xs = tokenizer $ words $ spaceyfier xs
@@ -341,6 +354,15 @@ checkName = foldr (\ x -> (&&) (isAlphaNum x || x == '_' || x == '\'')) True
 
 
 ---------- Parser:
+
+showParseResult :: String -> IO()
+showParseResult xs =
+    case parse xs of
+        Left x -> putStr x
+        Right (Program xs, _) -> putStr (showBoxed "Parser" ++ "\n\n" ++ hshowParseResult xs ++ "\n")
+            where
+                hshowParseResult (x:xs) = show x ++ "\n" ++ hshowParseResult xs
+                hshowParseResult []     = ""
 
 parse :: String -> Either String (Program, [Token])
 parse xs = parseProgram $ tokenize xs
@@ -636,20 +658,13 @@ pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
 
 
+----------------- functions for nice outputs of emulator:
 
------------------ Emulator:
 
-getAddress :: String -> Int
-getAddress xs = read (tail xs) :: Int
-
-emulate :: String -> IO()
-emulate xs =
-    case compile xs of
-        Right x -> putStr $ show (result (run x))
-        Left x  -> putStr x
-
-result :: State -> Result
-result (State _ _ s h _) = Result (val (h!!getAddress (last s)) h)
+showEmulate :: String -> IO()
+showEmulate xs = case compile xs of
+                    Left x -> putStr x
+                    Right x -> putStr $ show (EmulatorState (showRun x))
 
 showRun :: State -> [State]
 showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
@@ -661,11 +676,16 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                                 , heap  = runHeap i stack heap })
                          else [s]
 
-showEmulate :: String -> IO()
-showEmulate xs = case compile xs of
-                    Left x -> putStr x
-                    Right x -> putStr $ show (EmulatorState (showRun x))
+----------------- Emulator:
 
+emulate :: String -> IO()
+emulate xs =
+    case compile xs of
+        Right x -> putStr $ show (result (run x))
+        Left x  -> putStr x
+
+result :: State -> Result
+result (State _ _ s h _) = Result (val (h!!getAddress (last s)) h)
 
 run :: State -> State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
@@ -676,12 +696,6 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
                                  , stack = runStack i pc stack heap global
                                  , heap  = runHeap i stack heap }
                          else s
-
--- prüft, ob in Global eine main Funktion vorhanden ist                     
-mainInGlobal :: [([Char], b)] -> Bool
-mainInGlobal (("main",_):xs) = True
-mainInGlobal (x:xs)          = mainInGlobal xs
-mainInGlobal []              = False
 
 -- p = pc
 -- s = stack
@@ -822,6 +836,12 @@ findType Plus  = Float
 findType Times = Float
 findType _     = Bool
 
+-- prüft, ob in Global eine main Funktion vorhanden ist                     
+mainInGlobal :: [([Char], b)] -> Bool
+mainInGlobal (("main",_):xs) = True
+mainInGlobal (x:xs)          = mainInGlobal xs
+mainInGlobal []              = False
+
 insert1 :: Int -> Int -> [HeapCell] -> [HeapCell]
 insert1 adr akk h | adr > 0          = h!!akk : insert1 (adr-1) (akk+1) h
                   | otherwise        = []
@@ -837,6 +857,8 @@ arity Minus = UnaryOp
 arity DivBy = UnaryOp
 arity _     = BinaryOp
 
+getAddress :: String -> Int
+getAddress xs = read (tail xs) :: Int
 
 
 ---------- test examples:
