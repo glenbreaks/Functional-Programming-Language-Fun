@@ -228,19 +228,18 @@ instance Show Result
                 _          -> show x     ++ "\n\n"
 
 instance Show EmulatorState
-    where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
+    where
+        show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
             let i = code!!pc1 in
                 showInstr (show i) ++ "\n\nT:  "
-                                   ++ show (length stack-1) ++ "\nPC: c" ++ show pc2
-                                   ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
+                                   ++ show (length stack-1) ++ indent (4-length (show (length stack-1)) ++ columns pc2 stack heap
                                    ++ show (EmulatorState (s2:xs))
-          show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
+        show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
                 showInstr (show (code!!pc)) ++ "\n\nT:  "
                                    ++ show (length stack-1)
                                    ++ "\n\n" ++ showStack stack 2 ++ "\n"++ showHeap heap 2
                                    ++ show (result s)
-          show (EmulatorState _) = ""
-
+        show (EmulatorState _) = ""
 
 showStack :: [String] -> Int -> String
 showStack [] _ = ""
@@ -262,6 +261,24 @@ showInstr xs = "\n" ++ dots (length xs+4) ++ "\n: " ++ xs ++ " :\n" ++ dots (len
 indent :: Int -> String
 indent 0                      = ""
 indent n                      = " " ++ indent (n-1)
+
+columns :: Int -> [String] -> [HeapCell] -> String
+columns pc = hcolumns 0 [pc]
+    where hcolumns akk (x:xs) (y:ys) (z:zs) = "PC: " ++ show x ++ indent (20-length (show x))
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y ++ indent (20-length (show y))
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) xs ys zs
+          hcolumns akk []     (y:ys) (z:zs) = indent 24 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y ++ indent (20-length (show y))
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) [] ys zs
+          hcolumns akk []     (y:ys) []     = indent 24 
+                                           ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show y
+                                           ++ "\n" ++ hcolumns (akk+1) [] ys []
+          hcolumns akk []     []     (z:zs) = indent 50
+                                           ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
+                                           ++ "\n" ++ hcolumns (akk+1) [] [] zs
+          hcolumns akk []     []     []     = ""
 
 ---------- Tokenizer:
 
