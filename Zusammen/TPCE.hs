@@ -388,7 +388,6 @@ parseProgram xs1 = do
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
         _               -> Left ("Semicolon expected after definition " ++ showDef e)
 
-
 parseRestProgram :: Parser [Definition]
 parseRestProgram xs1 = do
     case xs1 of
