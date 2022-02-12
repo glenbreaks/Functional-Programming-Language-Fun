@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in sime cases
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in some cases
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
@@ -627,11 +627,11 @@ codeExpr (Neg                a)      env = codeExpr a env ++ [Pushpre Minus, Mak
 codeExpr (NegExpo            a)      env = codeExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
 codeExpr (OrX                a  b)   env = codeExpr (IfX a   (BoolVal True) b)  env
 codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False))   env
-codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
-codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
-codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
-codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
+codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
+codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
+codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
+codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
+codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
     where x | a     = 1
