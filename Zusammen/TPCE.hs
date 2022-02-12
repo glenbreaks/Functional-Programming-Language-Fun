@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in sime cases
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 import GHC.Float (int2Float)
@@ -110,6 +110,7 @@ data HeapCell
     | IND Int
     | PRE Token Op
     | UNINITIALIZED
+    deriving Eq
 
 data Op
     = UnaryOp
@@ -150,7 +151,7 @@ instance Show Token
         show (Name   x)      = x
 
 instance Show Definition
-    where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (15-length fun) ++ show (hshowArgs args) ++ indent (10-length (show (hshowArgs args))) ++ "(" ++ show expr ++ ")"
+    where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (abs (15-length fun)) ++ show (hshowArgs args) ++ indent (abs (30-length (show (hshowArgs args)))) ++ "(" ++ show expr ++ ")\n"
            where hshowArgs ((Variable x):xs) = x:hshowArgs xs
                  hshowArgs []                = []
 
@@ -239,6 +240,9 @@ instance Show EmulatorState
                 showBoxed (show (code!!pc))  ++ "\n\n" ++ show (result s)
           show (EmulatorState _) = ""
 
+showDef :: Definition -> String
+showDef (Definition (Variable a : _)_) = a
+
 showStack :: [String] -> Int -> String
 showStack [] _ = ""
 showStack xs n = hshowStack xs n 0
@@ -263,11 +267,11 @@ indent n                      = " " ++ indent (n-1)
 columns :: Int -> [String] -> [HeapCell] -> String
 columns pc stack (h:heap) =
     case stack of
-        (s:stack)  -> "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))
+        (s:stack)  -> "T:  " ++ show (length stack) ++ indent (15-length (show (length stack)))
                                    ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
                                    ++ "h0: "++ indent 2 ++ show h
                              ++ "\n" ++ hcolumns 1 [pc] stack heap
-        _          -> "T:  " ++ show (length stack-1) ++ indent 15
+        _          -> "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))          -- stack-1?
                             ++ indent 21 --    ++ "s0: " ++ indent 2 ++ s ++ indent (15-length stack)
                             ++ "h0: "++ indent 2 ++ show h
                 ++ "\n" ++ hcolumns 1 [pc] stack heap
@@ -283,11 +287,11 @@ columns pc stack (h:heap) =
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] [] zs
           hcolumns akk [x] []     []     = "PC: " ++ show x ++ indent (15-length (show x)) ++ "\n"
-          hcolumns akk []  (y:ys) (z:zs) = indent 19 
+          hcolumns akk []  (y:ys) (z:zs) = indent 19
                                            ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] ys zs
-          hcolumns akk []  (y:ys) []     = indent 19 
+          hcolumns akk []  (y:ys) []     = indent 19
                                            ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y
                                            ++ "\n" ++ hcolumns (akk+1) [] ys []
           hcolumns akk []  []     (z:zs) = indent 40
@@ -298,6 +302,9 @@ columns _ _ _ = ""
 
 
 ---------- Tokenizer:
+
+-- emulate bsp
+bsp = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
 
 showTokens :: String -> IO() -- just for output
 showTokens xs = let ys = tokenize xs in
@@ -311,7 +318,7 @@ tokenize xs = tokenizer $ words $ spaceyfier xs
 spaceyfier :: String -> String
 spaceyfier x =
    case x of
-       ';' : xs       -> " ; "  ++ spaceyfier xs    -- nach dem Strichpunkt kein Leerzeichen, weil als Eingabe danach ein Leerzeichen oder Zeilenumbruch kommen MUSS!
+       ';' : xs       -> " ; "  ++ spaceyfier xs
        ',' : xs       -> " , "  ++ spaceyfier xs
        '|' : xs       -> " | "  ++ spaceyfier xs
        '&' : xs       -> " & "  ++ spaceyfier xs
@@ -362,16 +369,19 @@ checkNumber = foldr ((&&) . isDigit) True
 checkName :: String -> Bool
 checkName = foldr (\ x -> (&&) (isAlphaNum x || x == '_' || x == '\'')) True
 
+-- Beispiele: spaceifyer, Variablennamen mit _, ' und Zahlen (InvalidName auslösen?)
 
 ---------- Parser:
+
+-- bsp zeigen, showParseResult bsp
 
 showParseResult :: String -> IO()
 showParseResult xs =
     case parse xs of
-        Left x -> putStr x
+        Left x -> putStrLn x
         Right (Program xs, _) -> putStr (showBoxed "Parser" ++ "\n\n" ++ hshowParseResult xs ++ "\n")
             where
-                hshowParseResult (x:xs) = show x ++ "\n" ++ hshowParseResult xs
+                hshowParseResult (x:xs) = show x ++ hshowParseResult xs
                 hshowParseResult []     = ""
 
 parse :: String -> Either String (Program, [Token])
@@ -386,7 +396,9 @@ parseProgram xs1 = do
             case xs4 of
                 []    -> return (Program (e:es), xs4)
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
-        _               -> Left ("Semicolon expected after definition " ++ showDef e)
+        _               -> Left ("Semicolon expected after definition " ++ showDef e) -- showDef zieht Funktionsnamen aus Datentyp Definition
+
+-- showParseResult "main = 1;, false," (allg Fehlerbehandlung) 396
 
 parseRestProgram :: Parser [Definition]
 parseRestProgram xs1 = do
@@ -456,6 +468,10 @@ parseExpr (If : xs1)  = do
                 _          -> Left "Expected 'else' after 'then' block"
         _          -> Left "Expected 'then' after 'if' block"
 parseExpr xs          = parseOrExpr xs
+
+-- Beispiele: Semicolon weg, Equals weg
+
+----------------------------------------------------------
 
 parseOrExpr :: Parser Expression
 parseOrExpr xs1 = do
@@ -550,7 +566,7 @@ parseAtomicExpr  (OpenPar : xs1)   = do
 parseAtomicExpr  (Name i : xs1)    = do
     (is, xs2) <- parseRestAtomicExpr xs1
     return (foldl Function (Variable i) is, xs2)
-parseAtomicExpr  _                 = Left "Expected: number, boolean or parseVariable"
+parseAtomicExpr  _                 = Left "Expected: number, boolean or variable"
 
 parseRestAtomicExpr :: Parser [Expression]
 parseRestAtomicExpr (Number i : xs1)  = do
@@ -573,22 +589,19 @@ parseRestAtomicExpr xs                = return ([], xs)
 
 parseVariable :: Parser Expression
 parseVariable (Name i : xs) = return (Variable i, xs)
-parseVariable _             = Left "parseVariable expected"
+parseVariable _             = Left "Expected: variable"
 
---- Hilfsfunktion Parser:
-
-showDef :: Definition -> String
-showDef (Definition (Variable a : _)_) = a
-
-
+-- Beispiele: ParsePositiveMult, AtomicExpr: restAtomic nur noch in Name, Unäres - und /, Assoziativität von Minus und /!
 
 ---------- Compiler:
+
+-- bsp zeigen, compile bs
 
 compile :: String -> Either String State
 compile xs =
     case parse xs of
-        (Right (Program xs, [])) -> return (compileProgram xs)
-        Left string              -> Left string
+        Right (Program xs, []) -> return (compileProgram xs)
+        Left string            -> Left (string ++ "\n")
 
 compileProgram :: [Definition] -> State
 compileProgram = foldl compileDef State{pc=0, code=initCode, stack=[], heap=[], global=[]}
@@ -618,11 +631,11 @@ codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a  [(v, po
 codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
 codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
-codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
+codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a  [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
-    where x | a         = 1
-            | not a     = 0
+    where x | a     = 1
+            | not a = 0
 codeExpr (Variable           a)      env =
     case pos (Variable a) env of
         Nothing -> [Pushfun a]
@@ -631,11 +644,11 @@ codeExpr (Variable           a)      env =
 codeLocDefs :: [LocDef] -> [(Expression, Int)] -> [Instruction]
 codeLocDefs x env = alloc n ++ cLocDefs x env n
     where
-        n                                     = length x
-        alloc 0                               = []
-        alloc x                               = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
-        cLocDefs ((LocDef var expr):xs) env n = codeExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
-        cLocDefs []                     _   _ = []
+        n                                   = length x
+        alloc 0                             = []
+        alloc x                             = [Alloc, Alloc, Makeapp] ++ alloc (x-1)
+        cLocDefs ((LocDef _ expr):xs) env n = codeExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
+        cLocDefs []                   _   _ = []
 
 --- Hilfsfunktionen Compiler:
 
@@ -663,6 +676,8 @@ pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
 
+-- instructions von / bzw - zeigen! (Makeapp)
+-- Highlight: Token wiederverwendet bei Pushpre für Opeartionsdatentypen, wobei DivBy hier 1/x bedeutet (Unäres /)
 
 ----------------- functions for nice outputs of emulator:
 
@@ -683,6 +698,8 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                          else [s]
 
 ----------------- Emulator:
+
+-- bsp zeigen, emulate bsp, showEmulate bsp
 
 emulate :: String -> IO()
 emulate xs =
@@ -768,40 +785,37 @@ runHeap (Operator op) s h =
                         b = val (h!!getAddress (last s)) h
                     in
                         case a of
-                            PRE op _ ->
-                                case b of
-                                    VAL t v -> h ++ [VAL t (compute op v 0)]
-                                    _       -> throw (NoValueFound (show b ++ show s ++ "1"))
-                            _        -> throw (NoValueFound (show a ++ show s ++ "2"))
+                            PRE op _ -> h ++ [VAL (findType op) (compute op b UNINITIALIZED)] -- zum Aufruf compute
+                            _        -> throw (NoValueFound (show a ++ show s))
         BinaryOp -> let a = val (h!!getAddress (s!!(length s-4))) h
                         b = val (h!!getAddress (s!!(length s-2))) h
                         c = val (h!!getAddress (last s)) h
                     in
                         case a of
-                            PRE op _ ->
-                                case b of
-                                    VAL _ v1 ->
-                                        case c of
-                                            VAL _ v2 -> h ++ [VAL (findType op) (compute op v1 v2)]
-                                            _        -> throw (NoValueFound (show c ++ show s ++ "3"))
-                                    _        -> throw (NoValueFound (show b ++ show s ++ show h++ "4"))
-                            _ -> throw (NoValueFound (show c ++ show s ++ "5"))
+                            PRE op _ -> h ++ [VAL (findType op) (compute op b c)]
+                            _        -> throw (NoValueFound (show c ++ show s))
         _        -> h
 runHeap Alloc         _ h = h ++ [UNINITIALIZED]
 runHeap (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (getAddress (last s))] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
 runHeap _             _ h = h
 
-compute :: Token -> Value -> Value -> Value
-compute Not      x _ | x == 0    = 1
+compute :: Token -> HeapCell -> HeapCell -> Value
+compute Not      (VAL Bool x) _ | x == 0    = 1
+                                | otherwise = 0
+compute Minus    (VAL Float x) _ = - x
+compute DivBy    (VAL Float x) _ = 1 / x
+compute LessThan (VAL Float x) (VAL Float y) | x < y     = 1
                      | otherwise = 0
-compute Minus    x _ = - x
-compute DivBy    x _ = 1 / x
-compute LessThan x y | x < y     = 1
-                     | otherwise = 0
-compute Is       x y | x == y    = 1
-                     | otherwise = 0
-compute Plus     x y = x + y
-compute Times    x y = x * y
+compute Is       (VAL Float x) (VAL Float y) | x == y    = 1
+                                             | otherwise = 0
+compute Is       (VAL Bool x)  (VAL Bool y)  | x == y    = 1
+                                             | otherwise = 0
+compute Plus     (VAL Float x) (VAL Float y) = x + y
+compute Times    (VAL Float x) (VAL Float y) = x * y
+compute _ (VAL Bool x) (VAL Float y) = throw (TypeCheck "Mismatched Types")
+compute _ (VAL Float x) (VAL Bool y) = throw (TypeCheck "Mismatched Types")
+compute _ _ _ = throw (TypeCheck "Couldn't match type")
+
 
 --- Hilfsfunktionen Emulator:
 
@@ -839,7 +853,9 @@ slider n s akk | n > 0     = s!!akk : slider (n-1) s (akk+1)
 
 findType :: Token -> Type
 findType Plus  = Float
+findType Minus = Float
 findType Times = Float
+findType DivBy = Float
 findType _     = Bool
 
 -- prüft, ob in Global eine main Funktion vorhanden ist                     
@@ -866,6 +882,7 @@ arity _     = BinaryOp
 getAddress :: String -> Int
 getAddress xs = read (tail xs) :: Int
 
+-- Beispiele: showRun mit allen States, showEmulate, Fehler erzeugen, Stack aus Strings!!!
 
 ---------- test examples:
 
