@@ -1,10 +1,10 @@
-module Datatypes (CompilerException(..), Token(..), Program(..), Definition(..), 
+module Datatypes (FunException(..), Token(..), Program(..), Definition(..), 
 LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), 
 Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), 
 Op(..), CompilerState(..), EmulatorState(..), Result(..)) where
 import Control.Exception (Exception, throw)
 
-data CompilerException
+data FunException
     = InvalidName !String
     | WrongAddress
     | NoValueFound !String
@@ -14,7 +14,7 @@ data CompilerException
     | ReturnAddressNotFound
     deriving Show
 
-instance Exception CompilerException
+instance Exception FunException
 
 data Token
     = Number Int
