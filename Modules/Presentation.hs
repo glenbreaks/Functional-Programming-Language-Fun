@@ -41,7 +41,6 @@ input code = do
     "6" -> do
       putStr "\nPlease enter your F Program:\n"
       programInput
-      input code
     "7" -> do
       syntax <- readFile "Syntax.txt"
       putStr "\n\n"
@@ -54,7 +53,7 @@ input code = do
 
 goodbye :: IO ()
 goodbye = do
-  putStr "Goodbye\n\n"
+  putStr "\nGoodbye\n\n"
 
 readUserFile :: IO String
 readUserFile = do
