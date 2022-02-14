@@ -1,19 +1,19 @@
-module Parser (showParseResult, parse) where
+module Parser (showParse, parse) where
 import Datatypes
 import Tokenizer
 import Show
 ---------- Parser:
 
--- bsp zeigen, showParseResult bsp
+-- bsp zeigen, showParse bsp
 
-showParseResult :: String -> IO()
-showParseResult xs =
+showParse :: String -> IO()
+showParse xs =
     case parse xs of
         Left x -> putStrLn x
-        Right (Program xs, _) -> putStr (showBoxed "Parser" ++ "\n\n" ++ hshowParseResult xs ++ "\n")
+        Right (Program xs, _) -> putStr (showBoxed "Parser" ++ "\n\n" ++ hshowParse xs ++ "\n")
             where
-                hshowParseResult (x:xs) = show x ++ hshowParseResult xs
-                hshowParseResult []     = ""
+                hshowParse (x:xs) = show x ++ hshowParse xs
+                hshowParse []     = ""
 
 parse :: String -> Either String (Program, [Token])
 parse xs = parseProgram $ tokenize xs
@@ -29,7 +29,7 @@ parseProgram xs1 = do
                 (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
         _               -> Left ("Semicolon expected after definition " ++ showDef e) -- showDef zieht Funktionsnamen aus Datentyp Definition
 
--- showParseResult "main = 1;, false," (allg Fehlerbehandlung) 396
+-- showParse "main = 1;, false," (allg Fehlerbehandlung) 396
 
 parseRestProgram :: Parser [Definition]
 parseRestProgram xs1 = do
