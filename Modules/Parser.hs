@@ -16,7 +16,10 @@ showParse xs =
                 hshowParse []     = ""
 
 parse :: String -> Either String (Program, [Token])
-parse xs = parseProgram $ tokenize xs
+parse xs =
+    case tokenize xs of
+        Right x -> parseProgram x
+        Left x  -> Left x
 
 parseProgram :: Parser Program
 parseProgram xs1 = do

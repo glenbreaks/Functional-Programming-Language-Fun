@@ -10,15 +10,15 @@ import Control.Exception (Exception, throw)
 bsp = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
 
 showTokens :: String -> IO() -- just for output
-showTokens xs = let ys = tokenize xs in
-    putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokens ys ++ "\n"
-        where hshowTokens (x:xs) = show x ++ "\n" ++ hshowTokens xs
-              hshowTokens []     = ""
+showTokens xs =
+    case tokenize xs of
+        Right x -> putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokens x ++ "\n"
+                    where hshowTokens (x:xs) = show x ++ "\n" ++ hshowTokens xs
+                          hshowTokens []     = ""
+        Left x  -> putStrLn x
 
 tokenize :: String -> Either String [Token]
-tokenize xs = case (tokenizer $ words $ spaceyfier xs) of
-    Right x -> x
-    error   -> error
+tokenize xs = tokenizer $ words $ spaceyfier xs
 
 spaceyfier :: String -> String
 spaceyfier x =
@@ -67,6 +67,7 @@ tokenizer (x:xs) =
             _       | checkNumber x                   -> return (Number (read x) : rest)
                     | isAlpha (head x) && checkName x -> return (Name x          : rest)
                     | otherwise                       -> Left ("Invalid name: " ++ show x)
+        error      -> error
 tokenizer []             = return[]
 
 checkNumber :: String -> Bool

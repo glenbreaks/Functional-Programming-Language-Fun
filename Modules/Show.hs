@@ -107,6 +107,9 @@ instance Show Token
         show (Number x)      = show x
         show (Name   x)      = x
 
+instance Show Program
+    where show (Program xs) = show xs
+
 instance Show Definition
     where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (abs (15-length fun)) ++ show (hshowArgs args) ++ indent (abs (15-length (show (hshowArgs args)))) ++ "(" ++ show expr ++ ")\n"
            where hshowArgs ((Variable x):xs) = x:hshowArgs xs
@@ -188,7 +191,7 @@ instance Show EmulatorState
     where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
                 showBoxed (show (code!!pc1)) ++ "\n\n" ++ columns pc2 stack heap ++ show (EmulatorState (s2:xs))
           show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
-                showBoxed (show (code!!pc))  ++ "\n\n" ++ show (result s)
+                showBoxed (show (code!!pc))  ++ "\n\n" ++ if pc == 3 then show (result s) else "Invalid input\n"
           show (EmulatorState _) = ""
 
 instance Show Result

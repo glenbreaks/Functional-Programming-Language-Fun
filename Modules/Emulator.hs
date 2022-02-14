@@ -10,17 +10,29 @@ import Control.Exception (Exception, throw)
 showEmulate :: String -> IO()
 showEmulate xs = case compile xs of
                     Left x -> putStr x
-                    Right x -> putStr $ show (EmulatorState (showRun x))
+                    Right x -> -- putStr $ show (EmulatorState (showRun x))
+                        case showRun x of
+                            Left x  -> putStrLn x
+                            Right x -> putStr $ show (EmulatorState x)
 
-showRun :: State -> [State]
+showRun :: State -> Either String [State]
 showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
-    if not (mainInGlobal global) then throw MissingMain else
-        let i = code!!pc in
-            if i /= Halt then
-                    s:showRun(s { pc    = runPC i pc stack heap
-                                , stack = runStack i pc stack heap global
-                                , heap  = runHeap i stack heap })
-                         else [s]
+    if not (mainInGlobal global) then Left "Missing main" else return (hshowRun s)
+        where hshowRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
+                let i = code!!pc in
+                    if i /= Halt then
+                        case runPC i pc stack heap of
+                            Right xpc ->
+                                case runStack i pc stack heap global of
+                                    Right xstack ->
+                                        case runHeap i stack heap of
+                                            Right xheap -> s:hshowRun(s { pc    = xpc
+                                                                        , stack = xstack
+                                                                        , heap  = xheap })
+                                            Left x -> [s]
+                                    Left x -> [s]
+                            Left x -> [s]
+                                else [s]
 
 ----------------- Emulator:
 
@@ -29,134 +41,165 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
 emulate :: String -> IO()
 emulate xs =
     case compile xs of
-        Right x -> putStr $ show (result (run x))
+        Right x -> 
+            case run x of
+                Right x -> putStr $ show (result x)
+                Left x  -> putStrLn x
         Left x  -> putStr x
 
 result :: State -> Result
 result (State _ _ s h _) = Result (val (h!!getAddress (last s)) h)
 
-run :: State -> State
+run :: State -> Either String State
 run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
-    if not (mainInGlobal global) then throw MissingMain else
+    if not (mainInGlobal global) then Left "Missing main" else
         let i = code!!pc in
             if i /= Halt then
-                           run s { pc    = runPC i pc stack heap
-                                 , stack = runStack i pc stack heap global
-                                 , heap  = runHeap i stack heap }
-                         else s
+                case runPC i pc stack heap of
+                    Right xpc ->
+                        case runStack i pc stack heap global of
+                            Right xstack ->
+                                case runHeap i stack heap of
+                                    Right xheap -> run s { pc    = xpc
+                                                         , stack = xstack
+                                                         , heap  = xheap }
+                                    Left x -> Left x
+                            Left x -> Left x
+                    Left x -> Left x
+                         else return s
 
 -- p = pc
 -- s = stack
 -- h = heap
 -- g = global
 
-runPC :: Instruction -> Int -> [String] -> [HeapCell] -> Int
+runPC :: Instruction -> Int -> [String] -> [HeapCell] -> Either String Int
 runPC Unwind p s h =
     case val (h!!getAddress (last s)) h of
-        APP _ _ -> p
-        _       -> p+1
+        APP _ _ -> return p
+        _       -> return (p+1)
 runPC Call   p s h =
     case val (h!!getAddress (last s)) h of
-        DEF _ _ adr    -> adr
-        PRE _ BinaryOp -> 4
-        PRE _ IfOp     -> 13
-        PRE _ UnaryOp  -> 21
-        _              -> p+1
-runPC Return p s _ = if head (s!!(length s-2)) == 'c' then getAddress (s!!(length s-2)) else throw ReturnAddressNotFound--c-Addr!
-runPC _      p _ _ = p+1
+        DEF _ _ adr    -> return adr
+        PRE _ BinaryOp -> return 4
+        PRE _ IfOp     -> return 13
+        PRE _ UnaryOp  -> return 21
+        _              -> return (p+1)
+runPC Return p s _ = if head (s!!(length s-2)) == 'c' then return (getAddress (s!!(length s-2))) else Left "Invalid input"
+runPC _      p _ _ = return (p+1)
 
-runStack :: Instruction -> Int -> [String] -> [HeapCell] -> [(String, Int)] -> [String]
-runStack (Pushfun arg)   _ s _ g = s ++ ["h" ++ show (address arg g)]
-runStack (Pushval t v)   _ s h _ = s ++ ["h" ++ show (length h)] -- new
-runStack (Pushparam arg) _ s h _ = s ++ ["h" ++ show (add2arg (s!!(length s-arg-2)) h)]
-runStack Makeapp         _ s h _ = init (init s) ++ ["h" ++ show (length h)]
-runStack (Slide arg)     _ s _ _ = slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)]
+runStack :: Instruction -> Int -> [String] -> [HeapCell] -> [(String, Int)] -> Either String [String]
+runStack (Pushfun arg)   _ s _ g =
+    case address arg g of
+        Right x -> return (s ++ ["h" ++ show x])
+        Left x  -> Left x
+runStack (Pushval t v)   _ s h _ = return (s ++ ["h" ++ show (length h)]) -- new
+runStack (Pushparam arg) _ s h _ =
+    case add2arg (s!!(length s-arg-2)) h of
+        Right x -> return (s ++ ["h" ++ show x])
+        Left x  -> Left x
+runStack Makeapp         _ s h _ = return (init (init s) ++ ["h" ++ show (length h)])
+runStack (Slide arg)     _ s _ _ = return (slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)])
 runStack Unwind          _ s h _ =
     case val (h!!getAddress (last s)) h of
-        APP x _ -> s ++ ["h" ++ show x]
-        _       -> s
+        APP x _ -> return (s ++ ["h" ++ show x])
+        _       -> return s
 runStack Call            p s h _ =
     case val (h!!getAddress (last s)) h of
-        DEF {}  -> s ++ ["c" ++ show (p+1)]
-        PRE _ _ -> s ++ ["c" ++ show (p+1)]
-        _       -> s
-runStack Return          _ s _ _ = init (init s) ++ [last s]
-runStack (Pushpre op)    _ s h _ = s ++ ["h" ++ show (length h)]
-runStack Updateop        _ s h _ = init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)]
+        DEF {}  -> return (s ++ ["c" ++ show (p+1)])
+        PRE _ _ -> return (s ++ ["c" ++ show (p+1)])
+        _       -> return s
+runStack Return          _ s _ _ = return (init (init s) ++ [last s])
+runStack (Pushpre op)    _ s h _ = return (s ++ ["h" ++ show (length h)])
+runStack Updateop        _ s h _ = return (init (init $ init s) ++ [s!!(length s - 2), s!!(length s - 3)])
 runStack (Operator op)   _ s h _ =
     case op of
-        UnaryOp  -> init (init $ init s) ++ [s!!(length s-2), "h" ++ show (length h)]
-        BinaryOp -> init (init $ init $ init $ init s) ++ [s!!(length s-3), "h" ++ show (length h)]
+        UnaryOp  -> return (init (init $ init s) ++ [s!!(length s-2), "h" ++ show (length h)])
+        BinaryOp -> return (init (init $ init $ init $ init s) ++ [s!!(length s-3), "h" ++ show (length h)])
         _        -> let a = val (h!!getAddress (last s)) h
-                    in init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++
-                        case a of
-                            VAL Bool 1 -> ["h" ++ show (add2arg(s!!(length s-5)) h)]
-                            VAL Bool _ -> ["h" ++ show (add2arg(s!!(length s-6)) h)]
-                            _          -> throw (NoValueFound (show op ++ show a))
-runStack Alloc           _ s h _ = s ++ ["h" ++ show (length h)]
-runStack (Updatelet _)   _ s h _ = init s
-runStack (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
-runStack _               _ s _ _ = s
+                    in case a of
+                            VAL Bool 1 ->
+                                case add2arg(s!!(length s-5)) h of
+                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
+                                    Left x  -> Left x
+                            VAL Bool _ ->
+                                case add2arg(s!!(length s-6)) h of
+                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
+                                    Left x  -> Left x
+                            _          -> Left "No value found"
+runStack Alloc           _ s h _ = return (s ++ ["h" ++ show (length h)])
+runStack (Updatelet _)   _ s h _ = return (init s)
+runStack (Slidelet arg)  _ s _ _ = return (slider (length s-arg-1) s 0 ++ [last s])
+runStack _               _ s _ _ = return s
 
-runHeap :: Instruction -> [String] -> [HeapCell] -> [HeapCell]
-runHeap (Pushval t v) _ h = h ++ [VAL t v] --getAddress hier überall für h-Zellen
-runHeap Makeapp       s h = h ++ [APP (getAddress (last s))  (getAddress (s!!(length s-2)))]
-runHeap (Pushpre op)  _ h = h ++ [PRE op (arity op)]
-runHeap Updateop      s h = insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h
-runHeap (Updatefun f) s h = insert1 (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insert2 (getAddress (s!!(length s-f-3))) h
+runHeap :: Instruction -> [String] -> [HeapCell] -> Either String [HeapCell]
+runHeap (Pushval t v) _ h = return (h ++ [VAL t v])
+runHeap Makeapp       s h = return (h ++ [APP (getAddress (last s))  (getAddress (s!!(length s-2)))])
+runHeap (Pushpre op)  _ h = return (h ++ [PRE op (arity op)])
+runHeap Updateop      s h = return (insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h)
+runHeap (Updatefun f) s h = return (insert1 (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insert2 (getAddress (s!!(length s-f-3))) h)
 runHeap (Operator op) s h =
     case op of
         UnaryOp  -> let a = val (h!!getAddress (s!!(length s-3))) h
                         b = val (h!!getAddress (last s)) h
                     in
                         case a of
-                            PRE op _ -> h ++ [VAL (findType op) (compute op b UNINITIALIZED)] -- zum Aufruf compute
-                            _        -> throw (NoValueFound (show a ++ show s))
+                            PRE op _ ->
+                                case compute op b UNINITIALIZED of
+                                    Right x -> return (h ++ [VAL (findType op) x]) -- zum Aufruf compute
+                                    Left x  -> Left x
+                            _        -> Left "No value found"
         BinaryOp -> let a = val (h!!getAddress (s!!(length s-4))) h
                         b = val (h!!getAddress (s!!(length s-2))) h
                         c = val (h!!getAddress (last s)) h
                     in
                         case a of
-                            PRE op _ -> h ++ [VAL (findType op) (compute op b c)]
-                            _        -> throw (NoValueFound (show c ++ show s))
-        _        -> h
-runHeap Alloc         _ h = h ++ [UNINITIALIZED]
-runHeap (Updatelet n) s h = insert1 (add2arg (s!!(length s-n-2)) h) 0 h ++ [IND (getAddress (last s))] ++ insert2 (add2arg (s!!(length s-n-2)) h) h
-runHeap _             _ h = h
+                            PRE op _ ->
+                                case compute op b c of
+                                    Right x -> return (h ++ [VAL (findType op) x])
+                                    Left x  -> Left x
+                            _        -> Left "No value found"
+        _        -> return h
+runHeap Alloc         _ h = return (h ++ [UNINITIALIZED])
+runHeap (Updatelet n) s h =
+    case add2arg (s!!(length s-n-2)) h of
+        Right x -> return (insert1 x 0 h ++ [IND (getAddress (last s))] ++ insert2 x h)
+        Left x  -> Left x
+runHeap _             _ h = return h
 
-compute :: Token -> HeapCell -> HeapCell -> Value
-compute Not      (VAL Bool x) _ | x == 0    = 1
-                                | otherwise = 0
-compute Minus    (VAL Float x) _ = - x
-compute DivBy    (VAL Float x) _ = 1 / x
-compute LessThan (VAL Float x) (VAL Float y) | x < y     = 1
-                     | otherwise = 0
-compute Is       (VAL Float x) (VAL Float y) | x == y    = 1
-                                             | otherwise = 0
-compute Is       (VAL Bool x)  (VAL Bool y)  | x == y    = 1
-                                             | otherwise = 0
-compute Plus     (VAL Float x) (VAL Float y) = x + y
-compute Times    (VAL Float x) (VAL Float y) = x * y
-compute _ (VAL Bool x) (VAL Float y) = throw (TypeCheck "Mismatched Types")
-compute _ (VAL Float x) (VAL Bool y) = throw (TypeCheck "Mismatched Types")
-compute _ _ _ = throw (TypeCheck "Couldn't match type")
+compute :: Token -> HeapCell -> HeapCell -> Either String Value
+compute Not      (VAL Bool x) _ | x == 0    = return 1
+                                | otherwise = return 0
+compute Minus    (VAL Float x) _ = return (- x)
+compute DivBy    (VAL Float x) _ = return (1 / x)
+compute LessThan (VAL Float x) (VAL Float y) | x < y     = return 1
+                                             | otherwise = return 0
+compute Is       (VAL Float x) (VAL Float y) | x == y    = return 1
+                                             | otherwise = return 0
+compute Is       (VAL Bool x)  (VAL Bool y)  | x == y    = return 1
+                                             | otherwise = return 0
+compute Plus     (VAL Float x) (VAL Float y) = return (x + y)
+compute Times    (VAL Float x) (VAL Float y) = return (x * y)
+compute _ (VAL Bool x) (VAL Float y) = Left "Mismatched types"
+compute _ (VAL Float x) (VAL Bool y) = Left "Mismatched types"
+compute _ _ _ = Left "Mismatched types"
 
 
 --- Hilfsfunktionen Emulator:
 
 -- sucht in der globalen Umgebung nach einem Funktionsnamen und liefert die HeapAdresse dieser Definition
-address :: String -> [(String, Int)] -> Int
+address :: String -> [(String, Int)] -> Either String Int
 address arg ((x, y):xs)
-    | x == arg  = y
+    | x == arg  = return y
     | otherwise = address arg xs
-address arg []    = throw (VariableNotInScope arg)     -- Fehler wird z.B. bei f a b = x; geworfen 
+address arg []    = Left "Variable not in scope"     -- Fehler wird z.B. bei f a b = x; geworfen 
 
 -- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
-add2arg :: String -> [HeapCell] -> Int
+add2arg :: String -> [HeapCell] -> Either String Int
 add2arg adr h =
     case val (h!!getAddress adr) h of
-        APP _ x -> x
-        _       -> throw WrongAddress
+        APP _ x -> return x
+        _       -> Left "Wrong address"
 
 -- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
 typ :: Int -> [HeapCell] -> Type
