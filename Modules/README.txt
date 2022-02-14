@@ -3,6 +3,7 @@ To-Do:
 - Kommentare entfernen und neue hinzufügen
 - Planung für Präsentation außerhalb des Abgabe-Codes
 - Syntax schöner
+- Right, dann Left! überall!
 
 README:
 - Syntaxänderungen!!!!
