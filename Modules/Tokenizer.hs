@@ -15,8 +15,10 @@ showTokens xs = let ys = tokenize xs in
         where hshowTokens (x:xs) = show x ++ "\n" ++ hshowTokens xs
               hshowTokens []     = ""
 
-tokenize :: String -> [Token]
-tokenize xs = tokenizer $ words $ spaceyfier xs
+tokenize :: String -> Either String [Token]
+tokenize xs = case (tokenizer $ words $ spaceyfier xs) of
+    Right x -> x
+    error   -> error
 
 spaceyfier :: String -> String
 spaceyfier x =
@@ -37,34 +39,35 @@ spaceyfier x =
        []             -> []
        _   : xs       -> head x : spaceyfier xs
 
-tokenizer :: [String] -> [Token]
+tokenizer :: [String] -> Either String [Token]
 tokenizer (x:xs) =
-    case x of
-        "|"     -> Or            : tokenizer xs
-        "&"     -> And           : tokenizer xs
-        "not"   -> Not           : tokenizer xs
-        "<"     -> LessThan      : tokenizer xs
-        "=="    -> Is            : tokenizer xs
-        "-"     -> Minus         : tokenizer xs
-        "+"     -> Plus          : tokenizer xs
-        "/"     -> DivBy         : tokenizer xs
-        "*"     -> Times         : tokenizer xs
-        "("     -> OpenPar       : tokenizer xs
-        ")"     -> ClosePar      : tokenizer xs
-        "let"   -> Let           : tokenizer xs
-        "in"    -> In            : tokenizer xs
-        "if"    -> If            : tokenizer xs
-        "then"  -> Then          : tokenizer xs
-        "else"  -> Else          : tokenizer xs
-        ";"     -> Semicolon     : tokenizer xs
-        ","     -> Comma         : tokenizer xs
-        "="     -> Equals        : tokenizer xs
-        "true"  -> Boolean True  : tokenizer xs
-        "false" -> Boolean False : tokenizer xs
-        _        | checkNumber x                   -> Number (read x) : tokenizer xs
-                 | isAlpha (head x) && checkName x -> Name x          : tokenizer xs
-                 | otherwise                       -> throw (InvalidName x)
-tokenizer []             = []
+    case tokenizer xs of
+        Right rest -> case x of
+            "|"     -> return (Or            : rest)
+            "&"     -> return (And           : rest)       
+            "not"   -> return (Not           : rest)
+            "<"     -> return (LessThan      : rest)
+            "=="    -> return (Is            : rest)
+            "-"     -> return (Minus         : rest)
+            "+"     -> return (Plus          : rest)
+            "/"     -> return (DivBy         : rest)
+            "*"     -> return (Times         : rest)
+            "("     -> return (OpenPar       : rest)
+            ")"     -> return (ClosePar      : rest)
+            "let"   -> return (Let           : rest)
+            "in"    -> return (In            : rest)
+            "if"    -> return (If            : rest)
+            "then"  -> return (Then          : rest)
+            "else"  -> return (Else          : rest)
+            ";"     -> return (Semicolon     : rest)
+            ","     -> return (Comma         : rest)
+            "="     -> return (Equals        : rest)
+            "true"  -> return (Boolean True  : rest)
+            "false" -> return (Boolean False : rest)
+            _       | checkNumber x                   -> return (Number (read x) : rest)
+                    | isAlpha (head x) && checkName x -> return (Name x          : rest)
+                    | otherwise                       -> Left ("Invalid name: " ++ show x)
+tokenizer []             = return[]
 
 checkNumber :: String -> Bool
 checkNumber = foldr ((&&) . isDigit) True
