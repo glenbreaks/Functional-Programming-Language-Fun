@@ -1,7 +1,7 @@
 module Datatypes (CompilerException(..), Token(..), Program(..), Definition(..), 
 LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), 
 Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), 
-Op(..), Result(..), EmulatorState(..)) where
+Op(..), CompilerState(..), EmulatorState(..), Result(..)) where
 import Control.Exception (Exception, throw)
 
 data CompilerException
@@ -11,6 +11,7 @@ data CompilerException
     | MissingMain
     | TypeCheck !String
     | VariableNotInScope !String
+    | ReturnAddressNotFound
     deriving Show
 
 instance Exception CompilerException
@@ -119,6 +120,8 @@ data Op
     | IfOp
     deriving Eq
 
-newtype Result = Result HeapCell
+newtype CompilerState = CompilerState State
 
 newtype EmulatorState = EmulatorState [State]
+
+newtype Result = Result HeapCell

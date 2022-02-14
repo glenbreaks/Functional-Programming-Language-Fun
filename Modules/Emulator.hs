@@ -62,7 +62,7 @@ runPC Call   p s h =
         PRE _ IfOp     -> 13
         PRE _ UnaryOp  -> 21
         _              -> p+1
-runPC Return p s _ = getAddress (s!!(length s-2))
+runPC Return p s _ = if head (s!!(length s-2)) == 'c' then getAddress (s!!(length s-2)) else throw ReturnAddressNotFound--c-Addr!
 runPC _      p _ _ = p+1
 
 runStack :: Instruction -> Int -> [String] -> [HeapCell] -> [(String, Int)] -> [String]
@@ -99,10 +99,10 @@ runStack (Slidelet arg)  _ s _ _ = slider (length s-arg-1) s 0 ++ [last s]
 runStack _               _ s _ _ = s
 
 runHeap :: Instruction -> [String] -> [HeapCell] -> [HeapCell]
-runHeap (Pushval t v) _ h = h ++ [VAL t v]
+runHeap (Pushval t v) _ h = h ++ [VAL t v] --getAddress hier überall für h-Zellen
 runHeap Makeapp       s h = h ++ [APP (getAddress (last s))  (getAddress (s!!(length s-2)))]
 runHeap (Pushpre op)  _ h = h ++ [PRE op (arity op)]
-runHeap Updateop      s h = insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h -- val(h!!...) h??
+runHeap Updateop      s h = insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h
 runHeap (Updatefun f) s h = insert1 (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insert2 (getAddress (s!!(length s-f-3))) h
 runHeap (Operator op) s h =
     case op of

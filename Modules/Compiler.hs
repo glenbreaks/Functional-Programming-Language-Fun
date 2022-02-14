@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in some cases
 
-module Compiler (compile) where
+module Compiler (showCompile, compile) where
 import Datatypes
 import Parser
 import Show
@@ -9,6 +9,12 @@ import GHC.Float (int2Float)
 ---------- Compiler:
 
 -- bsp zeigen, compile bs
+
+showCompile :: String -> IO()
+showCompile xs =
+    case compile xs of
+        Right x -> putStr (show (CompilerState x))
+        Left x  -> putStrLn x
 
 compile :: String -> Either String State
 compile xs =

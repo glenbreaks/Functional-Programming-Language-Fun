@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+
 module Show (showDef, showStack, showHeap, showBoxed, Show) where
 
 import Datatypes
@@ -106,7 +108,7 @@ instance Show Program
     where show = show
 
 instance Show Definition
-    where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (abs (15-length fun)) ++ show (hshowArgs args) ++ indent (abs (30-length (show (hshowArgs args)))) ++ "(" ++ show expr ++ ")\n"
+    where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (abs (15-length fun)) ++ show (hshowArgs args) ++ indent (abs (15-length (show (hshowArgs args)))) ++ "(" ++ show expr ++ ")\n"
            where hshowArgs ((Variable x):xs) = x:hshowArgs xs
                  hshowArgs []                = []
 
@@ -136,7 +138,7 @@ instance Show Instruction
           show (Pushpre Is)       = "Pushpre =="
           show (Pushpre OpenPar)  = "Pushpre ("
           show (Pushpre ClosePar) = "Pushpre )"
-          show (Pushpre x       ) = "Pushpre " ++ show x    -- x kann Number, Bool oder Name sein
+          show (Pushpre x)        = "Pushpre " ++ show x
           show (Updatefun i)      = "Update " ++ show i
           show Updateop           = "Update op"
           show (Operator o)       = "Operator " ++ show o
@@ -144,8 +146,21 @@ instance Show Instruction
           show (Updatelet i)      = "Updatelet " ++ show i
           show (Slidelet i)       = "Slidelet " ++ show i
 
-instance Show State
-    where show (State _ code stack heap global) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
+instance Show HeapCell
+    where show (APP a b  )   = "APP h" ++ show a ++ " h" ++ show b
+          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " c" ++ show y
+          show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
+          show (IND x    )   = "IND h" ++ show x
+          show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
+          show UNINITIALIZED = ""
+
+instance Show Op
+    where show UnaryOp  = "1"
+          show BinaryOp = "2"
+          show IfOp     = "3"
+
+instance Show CompilerState
+    where show (CompilerState (State _ code stack heap global)) = "\n\n················\n: Instructions :\n················\n" ++ showCode code 0
                                                ++ "\n········\n: Heap :\n········\n"                           ++ showHeap heap 4
                                                ++ "\n··········\n: Global :\n··········\n"                     ++ showGlobal global
                                                ++ "\n\n"
@@ -167,18 +182,12 @@ instance Show State
                 showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
                 showGlobal []                 = ""
 
-instance Show HeapCell
-    where show (APP a b  )   = "APP h" ++ show a ++ " h" ++ show b
-          show (DEF f x y)   = "DEF " ++ f ++ " " ++ show x ++ " c" ++ show y
-          show (VAL t v  )   = "VAL " ++ show t ++ " " ++ show v
-          show (IND x    )   = "IND h" ++ show x
-          show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
-          show UNINITIALIZED = ""
-
-instance Show Op
-    where show UnaryOp  = "1"
-          show BinaryOp = "2"
-          show IfOp     = "3"
+instance Show EmulatorState
+    where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
+                showBoxed (show (code!!pc1)) ++ "\n\n" ++ columns pc2 stack heap ++ show (EmulatorState (s2:xs))
+          show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
+                showBoxed (show (code!!pc))  ++ "\n\n" ++ show (result s)
+          show (EmulatorState _) = ""
 
 instance Show Result
     where show (Result x) = "\n>>> Result: " ++
@@ -187,10 +196,3 @@ instance Show Result
                 VAL Bool _ -> "false\n\n"
                 VAL _    a -> show a     ++ "\n\n"
                 _          -> show x     ++ "\n\n"
-
-instance Show EmulatorState
-    where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
-                showBoxed (show (code!!pc1)) ++ "\n\n" ++ columns pc2 stack heap ++ show (EmulatorState (s2:xs))
-          show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
-                showBoxed (show (code!!pc))  ++ "\n\n" ++ show (result s)
-          show (EmulatorState _) = ""
