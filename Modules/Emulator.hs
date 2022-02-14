@@ -1,7 +1,7 @@
-module Emulator (showEmulate, emulate, showRun) where
-import Datatypes (CompilerException(..), Token(..), Instruction(..), Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), Op(..), Result(..), EmulatorState(..))
-import Compiler (compile)
-import Show (showDef, showStack, showHeap, showBoxed)
+module Emulator (showEmulate, emulate) where
+import Datatypes
+import Compiler
+import Show
 import Control.Exception (Exception, throw)
 
 ----------------- functions for nice outputs of emulator:

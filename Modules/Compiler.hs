@@ -1,7 +1,9 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in some cases
+
 module Compiler (compile) where
-import Datatypes (CompilerException(..), Token(..), Program(..), Definition(..), LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), Op(..), Result(..), EmulatorState(..))
-import Parser (parse)
-import Show (showDef, showStack, showHeap, showBoxed)
+import Datatypes
+import Parser
+import Show
 import GHC.Float (int2Float)
 
 ---------- Compiler:
@@ -45,8 +47,8 @@ codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a [(v, pos
 codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
-    where x | a     = 1
-            | not a = 0
+    where x | a         = 1
+            | otherwise = 0
 codeExpr (Variable           a)      env =
     case pos (Variable a) env of
         Nothing -> [Pushfun a]

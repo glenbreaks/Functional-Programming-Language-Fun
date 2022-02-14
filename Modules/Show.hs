@@ -1,6 +1,6 @@
 module Show (showDef, showStack, showHeap, showBoxed, Show) where
 
-import Datatypes (CompilerException(..), Token(..), Program(..), Definition(..), LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), Op(..), Result(..), EmulatorState(..))
+import Datatypes
 ---------- Show-Funktionen:
 
 showDef :: Definition -> String

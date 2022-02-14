@@ -1,7 +1,7 @@
 module Parser (showParseResult, parse) where
-import Datatypes (Token(..), Program(..), Definition(..), LocDefs(..), LocDef(..), Expression(..), Parser(..))
-import Tokenizer (tokenize)
-import Show (showDef, showStack, showHeap, showBoxed)
+import Datatypes
+import Tokenizer
+import Show
 ---------- Parser:
 
 -- bsp zeigen, showParseResult bsp

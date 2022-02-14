@@ -1,8 +1,8 @@
-import Datatypes (CompilerException(..), Token(..), Program(..), Definition(..), LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), Op(..), Result(..), EmulatorState(..))
-import Tokenizer (showTokens)
-import Parser (showParseResult)
-import Compiler (compile)
-import Emulator (showEmulate, emulate)    
+import Datatypes
+import Tokenizer
+import Parser
+import Compiler
+import Emulator
 
 e1 = "bool x = ((x == true) | (x == false)); f x = if bool x | x < 1 then 1 else x * f (x - 1); main = f 6;"
 e2 = "main = quadrat (quadrat (3 * 1)); quadrat x = x * x;"

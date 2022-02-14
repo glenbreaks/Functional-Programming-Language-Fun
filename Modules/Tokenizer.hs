@@ -1,6 +1,6 @@
 module Tokenizer (showTokens, tokenize) where
 import Datatypes (CompilerException(..), Token(..))
-import Show (showDef, showStack, showHeap, showBoxed)
+import Show
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
 
