@@ -2,7 +2,6 @@ module Emulator (showEmulate, emulate) where
 import Datatypes
 import Compiler
 import Show
-import Control.Exception (Exception, throw)
 
 ----------------- functions for nice outputs of emulator:
 

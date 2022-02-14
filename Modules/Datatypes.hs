@@ -1,20 +1,7 @@
-module Datatypes (FunException(..), Token(..), Program(..), Definition(..), 
+module Datatypes (Token(..), Program(..), Definition(..), 
 LocDefs(..), LocDef(..), Expression(..), Parser(..), Instruction(..), 
 Type(..), Value(..), State(..), Stack(..), Heap(..), Global(..), HeapCell(..), 
 Op(..), CompilerState(..), EmulatorState(..), Result(..)) where
-import Control.Exception (Exception, throw)
-
-data FunException
-    = InvalidName !String
-    | WrongAddress
-    | NoValueFound !String
-    | MissingMain
-    | TypeCheck !String
-    | VariableNotInScope !String
-    | ReturnAddressNotFound
-    deriving Show
-
-instance Exception FunException
 
 data Token
     = Number Int

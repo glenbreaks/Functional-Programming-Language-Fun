@@ -3,8 +3,6 @@ import Tokenizer
 import Parser
 import Compiler
 import Emulator
-import Control.Exception (SomeException, try)
-import Control.Monad (unless)
 
 letsGo :: IO ()
 letsGo = do

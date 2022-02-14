@@ -1,5 +1,5 @@
 module Tokenizer (showTokens, tokenize) where
-import Datatypes (FunException(..), Token(..))
+import Datatypes (Token(..))
 import Show
 import Data.Char(isDigit, isAlpha, isAlphaNum)
 import Control.Exception (Exception, throw)
