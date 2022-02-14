@@ -19,6 +19,9 @@ showHeap [] _ = ""
 showHeap xs n = hshowHeap xs n 0
     where hshowHeap (x:xs) n akk = "h" ++ show akk ++ ":" ++ indent (n - length (show akk)) ++ show x ++ "\n" ++ hshowHeap xs n (akk+1)
           hshowHeap []     _ _   = ""
+showGlobal :: [(String, Int)] -> String
+showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
+showGlobal []                 = ""
 
 showBoxed :: String -> String
 showBoxed xs = "\n" ++ dots (length xs+4) ++ "\n: " ++ xs ++ " :\n" ++ dots (length xs+4)
@@ -104,9 +107,6 @@ instance Show Token
         show (Number x)      = show x
         show (Name   x)      = x
 
-instance Show Program
-    where show = show
-
 instance Show Definition
     where show (Definition ((Variable fun):args) expr) = "Definition " ++ fun ++ indent (abs (15-length fun)) ++ show (hshowArgs args) ++ indent (abs (15-length (show (hshowArgs args)))) ++ "(" ++ show expr ++ ")\n"
            where hshowArgs ((Variable x):xs) = x:hshowArgs xs
@@ -154,6 +154,10 @@ instance Show HeapCell
           show (PRE t op )   = "PRE " ++ show t ++ " " ++ show op
           show UNINITIALIZED = ""
 
+instance Show State
+    where show (State pc code stack heap global) = show code ++ "\n" ++ show heap ++ "\n" ++ show global 
+
+
 instance Show Op
     where show UnaryOp  = "1"
           show BinaryOp = "2"
@@ -179,8 +183,6 @@ instance Show CompilerState
                         DEF f _ adr -> if n == adr then f else name n xs
                         _           -> ""
                 name _ []                     = ""
-                showGlobal ((x, y):xs)        = "h" ++ show y ++ ":" ++ indent (4 - length (show y)) ++ x ++ "\n" ++ showGlobal xs
-                showGlobal []                 = ""
 
 instance Show EmulatorState
     where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =

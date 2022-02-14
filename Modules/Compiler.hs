@@ -8,7 +8,7 @@ import GHC.Float (int2Float)
 
 ---------- Compiler:
 
--- bsp zeigen, compile bs
+-- bsp zeigen, showCompile bs
 
 showCompile :: String -> IO()
 showCompile xs =
