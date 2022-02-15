@@ -8,7 +8,7 @@ letsGo :: IO ()
 letsGo = do
   putStr "\n\nWelcome to Fun, our implementation of the functional programming language F.\n"
   putStr "We hope you have fun with Fun  : )     - Chrissi, Daniel, Jonny, Kathy and Lara\n\n"
-  putStr "\nPlease enter your F Program:\n"
+  putStr "\nPlease enter your Fun Program:\n"
   programInput
 
 programInput = do
