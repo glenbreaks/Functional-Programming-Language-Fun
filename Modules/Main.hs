@@ -6,9 +6,15 @@ import Emulator
 
 letsGo :: IO ()
 letsGo = do
-  putStr "\n\nWelcome to Fun, our implementation of the functional programming language F.\n"
-  putStr "We hope you have fun with Fun  : )     - Chrissi, Daniel, Jonny, Kathy and Lara\n\n"
-  putStr "\nPlease enter your Fun Program:\n"
+  putStr ("\n\n               Welcome to\n"
+       ++ "     ______   __   __   __   __   __\n"
+       ++ "    |   ___| |  | |  | |  \\ |  | |  |\n"
+       ++ "    |  |__   |  | |  | |   \\|  | |__|\n"
+       ++ "    |   __|  |  |_|  | |  |\\   |  __\n"
+       ++ "    |__|      \\_____/  |__| \\__| |__|\n\n\n"
+       ++ "This is our implementation of the functional programming language F.\n"
+       ++ "We hope you have fun with Fun  : )     - Chrissi, Daniel, Jonny, Kathy and Lara\n\n"
+       ++ "\nPlease enter your Fun Program:\n")
   programInput
 
 programInput = do
