@@ -8,10 +8,10 @@ import Show
 
 showEmulate :: String -> IO()
 showEmulate xs = case compile xs of
-                    Left x -> putStrLn x
+                    Left x -> putStrLn ("*** " ++ x)
                     Right x ->
                         case showRun x of
-                            Left x  -> putStrLn x
+                            Left x  -> putStrLn ("*** " ++ x)
                             Right x -> putStr $ show (EmulatorState x)
 
 showRun :: State -> Either String [State]
@@ -21,16 +21,16 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                 let i = code!!pc in
                     if i /= Halt then
                         case runPC i pc stack heap of
+                            Left x -> [s]
                             Right xpc ->
                                 case runStack i pc stack heap global of
+                                    Left x -> [s]
                                     Right xstack ->
                                         case runHeap i stack heap of
                                             Left x -> [s]
                                             Right xheap -> s:hshowRun(s { pc    = xpc
                                                                         , stack = xstack
                                                                         , heap  = xheap })
-                                    Left x -> [s]
-                            Left x -> [s]
                                 else [s]
 
 ----------------- Emulator:
@@ -40,11 +40,11 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
 emulate :: String -> IO()
 emulate xs =
     case compile xs of
+        Left x  -> putStrLn ("*** " ++ x)
         Right x -> 
             case run x of
+                Left x  -> putStrLn ("*** " ++ x)
                 Right x -> putStr $ show (result x)
-                Left x  -> putStrLn x
-        Left x  -> putStr x
 
 result :: State -> Result
 result (State _ _ s h _) = Result (val (h!!getAddress (last s)) h)
@@ -55,16 +55,16 @@ run s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
         let i = code!!pc in
             if i /= Halt then
                 case runPC i pc stack heap of
+                    Left x -> Left x
                     Right xpc ->
                         case runStack i pc stack heap global of
+                            Left x -> Left x
                             Right xstack ->
                                 case runHeap i stack heap of
+                                    Left x -> Left x
                                     Right xheap -> run s { pc    = xpc
                                                          , stack = xstack
                                                          , heap  = xheap }
-                                    Left x -> Left x
-                            Left x -> Left x
-                    Left x -> Left x
                          else return s
 
 -- p = pc
@@ -84,19 +84,19 @@ runPC Call   p s h =
         PRE _ IfOp     -> return 13
         PRE _ UnaryOp  -> return 21
         _              -> return (p+1)
-runPC Return p s _ = if head (s!!(length s-2)) == 'c' then return (getAddress (s!!(length s-2))) else Left "Invalid input"
+runPC Return p s _ = if head (s!!(length s-2)) == 'c' then return (getAddress (s!!(length s-2))) else Left "Runtime error"
 runPC _      p _ _ = return (p+1)
 
 runStack :: Instruction -> Int -> [String] -> [HeapCell] -> [(String, Int)] -> Either String [String]
 runStack (Pushfun arg)   _ s _ g =
     case address arg g of
-        Right x -> return (s ++ ["h" ++ show x])
         Left x  -> Left x
+        Right x -> return (s ++ ["h" ++ show x])
 runStack (Pushval t v)   _ s h _ = return (s ++ ["h" ++ show (length h)]) -- new
 runStack (Pushparam arg) _ s h _ =
     case add2arg (s!!(length s-arg-2)) h of
-        Right x -> return (s ++ ["h" ++ show x])
         Left x  -> Left x
+        Right x -> return (s ++ ["h" ++ show x])
 runStack Makeapp         _ s h _ = return (init (init s) ++ ["h" ++ show (length h)])
 runStack (Slide arg)     _ s _ _ = return (slider (length s-arg-2) s 0 ++ [s!!(length s-2), s!!(length s-1)])
 runStack Unwind          _ s h _ =
@@ -119,13 +119,13 @@ runStack (Operator op)   _ s h _ =
                     in case a of
                             VAL Bool 1 ->
                                 case add2arg(s!!(length s-5)) h of
-                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
                                     Left x  -> Left x
+                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
                             VAL Bool _ ->
                                 case add2arg(s!!(length s-6)) h of
-                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
                                     Left x  -> Left x
-                            _          -> Left "No value found"
+                                    Right x -> return (init (init $ init $ init $ init s) ++ [s!!(length s-2)] ++ ["h" ++ show x])
+                            _          -> Left "Runtime error"
 runStack Alloc           _ s h _ = return (s ++ ["h" ++ show (length h)])
 runStack (Updatelet _)   _ s h _ = return (init s)
 runStack (Slidelet arg)  _ s _ _ = return (slider (length s-arg-1) s 0 ++ [last s])
@@ -145,9 +145,9 @@ runHeap (Operator op) s h =
                         case a of
                             PRE op _ ->
                                 case compute op b UNINITIALIZED of
-                                    Right x -> return (h ++ [VAL (findType op) x]) -- zum Aufruf compute
                                     Left x  -> Left x
-                            _        -> Left "No value found"
+                                    Right x -> return (h ++ [VAL (findType op) x]) -- zum Aufruf compute
+                            _        -> Left "Runtime error"
         BinaryOp -> let a = val (h!!getAddress (s!!(length s-4))) h
                         b = val (h!!getAddress (s!!(length s-2))) h
                         c = val (h!!getAddress (last s)) h
@@ -155,15 +155,15 @@ runHeap (Operator op) s h =
                         case a of
                             PRE op _ ->
                                 case compute op b c of
-                                    Right x -> return (h ++ [VAL (findType op) x])
                                     Left x  -> Left x
-                            _        -> Left "No value found"
+                                    Right x -> return (h ++ [VAL (findType op) x])
+                            _        -> Left "Runtime error"
         _        -> return h
 runHeap Alloc         _ h = return (h ++ [UNINITIALIZED])
 runHeap (Updatelet n) s h =
     case add2arg (s!!(length s-n-2)) h of
-        Right x -> return (insert1 x 0 h ++ [IND (getAddress (last s))] ++ insert2 x h)
         Left x  -> Left x
+        Right x -> return (insert1 x 0 h ++ [IND (getAddress (last s))] ++ insert2 x h)
 runHeap _             _ h = return h
 
 compute :: Token -> HeapCell -> HeapCell -> Either String Value
@@ -191,14 +191,14 @@ address :: String -> [(String, Int)] -> Either String Int
 address arg ((x, y):xs)
     | x == arg  = return y
     | otherwise = address arg xs
-address arg []    = Left "Variable not in scope"     -- Fehler wird z.B. bei f a b = x; geworfen 
+address arg []    = Left ("Variable '" ++ arg ++ "' not in scope")     -- Fehler wird z.B. bei f a b = x; geworfen 
 
 -- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
 add2arg :: String -> [HeapCell] -> Either String Int
 add2arg adr h =
     case val (h!!getAddress adr) h of
         APP _ x -> return x
-        _       -> Left "Wrong address"
+        _       -> Left "Runtime error"
 
 -- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
 typ :: Int -> [HeapCell] -> Type

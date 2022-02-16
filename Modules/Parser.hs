@@ -9,7 +9,7 @@ import Show
 showParse :: String -> IO()
 showParse xs =
     case parse xs of
-        Left x -> putStrLn x
+        Left x -> putStrLn ("*** " ++ x)
         Right (Program xs, _) -> putStr (showBoxed "Parser" ++ "\n\n" ++ hshowParse xs ++ "\n")
             where
                 hshowParse (x:xs) = show x ++ hshowParse xs
@@ -18,8 +18,8 @@ showParse xs =
 parse :: String -> Either String (Program, [Token])
 parse xs =
     case tokenize xs of
-        Right x -> parseProgram x
         Left x  -> Left x
+        Right x -> parseProgram x
 
 parseProgram :: Parser Program
 parseProgram xs1 = do
@@ -29,8 +29,8 @@ parseProgram xs1 = do
             (es, xs4) <- parseRestProgram xs3
             case xs4 of
                 []    -> return (Program (e:es), xs4)
-                (x:_) -> Left ("Parse error on input: " ++ show x)   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
-        _               -> Left ("Semicolon expected after definition " ++ showDef e) -- showDef zieht Funktionsnamen aus Datentyp Definition
+                (x:_) -> Left ("Parse error on input '" ++ show x ++ "'")   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
+        _               -> Left ("Semicolon expected after definition '" ++ showDef e ++ "'") -- showDef zieht Funktionsnamen aus Datentyp Definition
 
 -- showParse "main = 1;, false," (allg Fehlerbehandlung) 396
 
@@ -43,7 +43,7 @@ parseRestProgram xs1 = do
                 Semicolon : xs3 -> do
                     (es, xs4) <- parseRestProgram xs3
                     return (e:es, xs4)
-                _               -> Left ("Semicolon expected after definition " ++ showDef e)
+                _               -> Left ("Semicolon expected after definition '" ++ showDef e ++ "'")
         _          -> return ([], xs1)
 
 parseDef :: Parser Definition
@@ -194,7 +194,7 @@ parseAtomicExpr  (OpenPar : xs1)   = do
 parseAtomicExpr  (Name i : xs1)    = do
     (is, xs2) <- parseRestAtomicExpr xs1
     return (foldl Function (Variable i) is, xs2)
-parseAtomicExpr  _                 = Left "Expected: number, boolean or variable"
+parseAtomicExpr  _                 = Left "Number, boolean or variable expected"
 
 parseRestAtomicExpr :: Parser [Expression]
 parseRestAtomicExpr (Number i : xs1)  = do
@@ -217,6 +217,6 @@ parseRestAtomicExpr xs                = return ([], xs)
 
 parseVariable :: Parser Expression
 parseVariable (Name i : xs) = return (Variable i, xs)
-parseVariable _             = Left "Expected: variable"
+parseVariable _             = Left "Variable expected"
 
 -- Beispiele: ParsePositiveMult, AtomicExpr: restAtomic nur noch in Name, Unäres - und /, Assoziativität von Minus und /!

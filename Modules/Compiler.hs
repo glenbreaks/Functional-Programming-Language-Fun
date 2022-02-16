@@ -13,14 +13,14 @@ import GHC.Float (int2Float)
 showCompile :: String -> IO()
 showCompile xs =
     case compile xs of
+        Left x  -> putStrLn ("*** " ++ x)
         Right x -> putStr (show (CompilerState x))
-        Left x  -> putStrLn x
 
 compile :: String -> Either String State
 compile xs =
     case parse xs of
+        Left x                 -> Left x
         Right (Program xs, []) -> return (compileProgram xs)
-        Left string            -> Left (string ++ "\n")
 
 compileProgram :: [Definition] -> State
 compileProgram = foldl compileDef State{pc=0, code=initCode, stack=[], heap=[], global=[]}
