@@ -20,9 +20,9 @@
 
 ## Syntax changes
 We made three adjustments to the F syntax:
-1. We decided to interchange the semicolons between multiple `Local Definitions` with commas because we wanted semicolons to bo used only between multiple `Definitions` (for better readability).
-2. According to the script the precedence of the negation should be lower than the precedence of an addition. This would lead to `-5 + 2` being evaluated as `-7`. We wanted our syntax to be more intuitive so we changed the precedences to let `-5 + 2` be evaluated as `-3`.
-3. As opposed to the script we allow inputs of the form `A-B-C` and `A/B/C` by implementing a left associativity for `-` and `/`.
+1. We decided to interchange the semicolons between multiple `Local Definitions` with commas because we wanted semicolons to be used only between multiple `Definitions` (for better readability).
+2. According to the script the precedence of the negation should be lower than the precedence of the addition. This would lead to `-5 + 2` being evaluated as `-7`. We wanted our syntax to be more intuitive so we changed the precedences to let `-5 + 2` be evaluated as `-3`.
+3. As opposed to the script we allowed inputs of the form `A-B-C` and `A/B/C` by implementing a left associativity for `-` and `/`.
    
 <br/>
 
@@ -55,7 +55,7 @@ Each module provides a `function` and a `showFunction`. When other modules want 
     ```
 ### Compiler
 - ### `compile`
-    takes a `String` (your Fun program) as input, calls `parse` on it and converts the AST into a list of `Instructions`. This is list is appended to `initCode` which contains the `Instructions` that call the `main` funcion, ensure the termination of the code and enable the emulation of unary, binary and if `Expressions`. `compile` also initializes `Heap`, `Global`, `PC` and `Stack`:
+    takes a `String` (your Fun program) as input, calls `parse` on it and converts the AST into a list of `Instructions`. This list is appended to `initCode` which contains the `Instructions` that call the `main` function, ensure the termination of the code and enable the emulation of unary, binary and if `Expressions`. `compile` also initializes `Heap`, `Global`, `PC` and `Stack`:
     ```Haskell
     pc     = 0
     code   = initCode ++ [Instruction]
@@ -78,7 +78,7 @@ Each module provides a `function` and a `showFunction`. When other modules want 
     takes a `String` (your Fun program) as input, calls `compile` on it and uses the `State` as input for `run` which emulates the `Instructions` step by step and changes `PC`, `Stack` and `Heap` accordingly. It is a recursive function which overwrites the old `State` after each `Instruction` is processed. The final `State` contains the result of the emulation and is returned to `emulate` which unpacks the result and returns it.
 
 - ### `showEmulate`
-    viualizes `emulate` by showing each state of the emulation process. In order to do that, it needs to know how the `State` looked afte each instruction, but run doesn't provide this information. So it calls `showRun` which doesn't overwrite the old State, but rather appends each new `State` to a list in a recursive manner.
+    visualizes `emulate` by showing each state of the emulation process. In order to do that, it needs to know how the `State` looked after each `Instruction`, but run doesn't provide this information. So it calls `showRun` which doesn't overwrite the old `State`, but rather appends each new `State` to a list in a recursive manner.
    
 <br/>
 
