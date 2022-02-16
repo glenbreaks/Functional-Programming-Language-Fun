@@ -71,7 +71,7 @@ parseRestLocDefs (Comma : xs1) = do
     (e, xs2)  <- parseLocDef xs1
     (es, xs3) <- parseRestLocDefs xs2
     return (e:es, xs3)
-parseRestLocDefs xs                = return ([], xs)
+parseRestLocDefs xs            = return ([], xs)
 
 parseLocDef :: Parser LocDef
 parseLocDef xs1 = do
@@ -136,15 +136,15 @@ parseCompareExpr xs1 = do
     (e, xs2)  <- parseAddExpr  xs1
     case xs2 of
         LessThan : xs3 -> do
-            (es, xs4) <- parseAddExpr  xs3
+            (es, xs4) <- parseAddExpr xs3
             return (LessThanX e es, xs4)
         Is : xs3       -> do
-            (es, xs4) <- parseAddExpr  xs3
+            (es, xs4) <- parseAddExpr xs3
             return (IsX e es, xs4)
         _              -> return (e, xs2)
 
-parseAddExpr  :: Parser Expression
-parseAddExpr  xs1 = do
+parseAddExpr :: Parser Expression
+parseAddExpr xs1 = do
     (e, xs2)  <- parseNegExpr  xs1
     (es, xs3) <- parseRestAddExpr xs2
     return (foldl Sum e es, xs3)

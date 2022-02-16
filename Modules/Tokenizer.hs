@@ -12,10 +12,10 @@ bsp = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 
 showTokenize :: String -> IO() -- just for output
 showTokenize xs =
     case tokenize xs of
+        Left x  -> putStrLn x
         Right x -> putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokenize x ++ "\n"
                     where hshowTokenize (x:xs) = show x ++ "\n" ++ hshowTokenize xs
                           hshowTokenize []     = ""
-        Left x  -> putStrLn x
 
 tokenize :: String -> Either String [Token]
 tokenize xs = tokenizer $ words $ spaceyfier xs
@@ -83,6 +83,7 @@ tok xs = htok strings tokens xs
 tokenizer :: [String] -> Either String [Token]
 tokenizer (x:xs) =
     case tokenizer xs of
+        Left x     -> Left x
         Right rest -> case x of
             "|"     -> return (Or            : rest)
             "&"     -> return (And           : rest)       
@@ -108,7 +109,6 @@ tokenizer (x:xs) =
             _       | checkNumber x                   -> return (Number (read x) : rest)
                     | isAlpha (head x) && checkName x -> return (Name x          : rest)
                     | otherwise                       -> Left ("Invalid name: " ++ show x)
-        error      -> error
 tokenizer []             = return[]
 
 checkNumber :: String -> Bool

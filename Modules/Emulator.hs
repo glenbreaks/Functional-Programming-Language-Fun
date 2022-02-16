@@ -181,7 +181,7 @@ compute Plus     (VAL Float x) (VAL Float y) = return (x + y)
 compute Times    (VAL Float x) (VAL Float y) = return (x * y)
 compute _ (VAL Bool x) (VAL Float y) = Left "Mismatched types"
 compute _ (VAL Float x) (VAL Bool y) = Left "Mismatched types"
-compute _ _ _ = Left "Mismatched types"
+compute _ _             _            = Left "Mismatched types"
 
 
 --- Hilfsfunktionen Emulator:
@@ -205,7 +205,7 @@ typ :: Int -> [HeapCell] -> Type
 typ adr h =
     case val (h!!adr) h of
         VAL Float _ -> Float
-        _              -> Bool
+        _           -> Bool
 
 -- liefert den Wert einer IND-Zelle an einer bestimmten Heap-Adresse
 val :: HeapCell -> [HeapCell] -> HeapCell
