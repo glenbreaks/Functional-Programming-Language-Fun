@@ -3,9 +3,32 @@
 ### An implementation of the functional programming language F in Haskell
 <br/>
 
+## How to get started
+1. The fun way
+   ```Shell
+   ghci Main.hs
+   letsGo
+   ```
+2. The other way
+   ```Shell
+   ghci Main.hs
+   emulate "your Fun code"
+   ```
+3. The hard way (*see below)
+   
+<br/>
+
+## Syntax changes
+We made three adjustments to the F syntax:
+1. We decided to interchange the semicolons between multiple `Local Definitions` with commas because we wanted semicolons to bo used only between multiple `Definitions` (for better readability).
+2. According to the script the precedence of the negation should be lower than the precedence of an addition. This would lead to `-5 + 2` being evaluated as `-7`. We wanted our syntax to be more intuitive so we changed the precedences to let `-5 + 2` be evaluated as `-3`.
+3. As opposed to the script we allow inputs of the form `A-B-C` and `A/B/C` by implementing a left associativity for `-` and `/`.
+   
+<br/>
+
 ## Modules
 ### Main
-The Main module is an interface for our entire implementation. It imports all of the modules below. You can either call the modules' functions directly or call **`letsGo`** for a fun interactive experience of Fun!
+The Main module is the interface for our entire implementation. It imports all of the modules below. You can either call the modules' functions directly or call **`letsGo`** for a fun and interactive experience of Fun!
 
 Each module provides a `function` and a `showFunction`. When other modules want to continue processing the result of a different module they always call `function`, never `showFunction`. The only purpose of `showFunction` is to create a nice, more comprehensive output of an intermediate result.
 
@@ -48,7 +71,7 @@ Each module provides a `function` and a `showFunction`. When other modules want 
     ```
 
 - ### `showCompile`
-    provides a better visualization of the initial `State`. It shows neither `PC` nor `Stack`.
+    provides a better visualization of the initial `State`. It only shows `Instructions`, `Heap` and `Global`.
 
 ### Emulator
 - ### `emulate`
@@ -56,22 +79,32 @@ Each module provides a `function` and a `showFunction`. When other modules want 
 
 - ### `showEmulate`
     viualizes `emulate` by showing each state of the emulation process. In order to do that, it needs to know how the `State` looked afte each instruction, but run doesn't provide this information. So it calls `showRun` which doesn't overwrite the old State, but rather appends each new `State` to a list in a recursive manner.
+   
+<br/>
 
+## Highlights
+- letsGo function
+- monadic error handling
+- syntax changes
+- it works
+- it's Fun!
+  
+<br/>
 
+---
 
-
-
-
-
-
-
-
-
-- Syntaxänderungen!!!!
-- Stack aus Strings nur für Ausgabe
-
-- alles monadische Fehlerbehandlung bitches yeah!
-
-## To-Do:
-- Kommentare entfernen und neue hinzufügen
-- Planung für Präsentation außerhalb des Abgabe-Codes
+*3.   The hard way
+   ```Haskell
+   -- myProgram.hs
+   import Tokenizer
+   import Parser
+   import Compiler
+   import Emulator
+   import Datatypes
+   import Show
+   example = showTokenize "your Fun code"
+   ```
+   ```Shell
+   ghci myProgram.hs
+   example
+   ```
