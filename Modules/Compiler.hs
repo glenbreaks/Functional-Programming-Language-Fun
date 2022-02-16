@@ -78,17 +78,17 @@ initCode = [Reset, Pushfun "main", Call, Halt]
     ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
 
 buildEnv :: [Expression] -> [(Expression, Int)]
-buildEnv xs = pos xs 1
+buildEnv xs = hpos xs 1
     where
-        pos [] _ = []
-        pos (x:xs) akk = (x, akk) : pos xs (akk + 1)
+        hpos [] _ = []
+        hpos (x:xs) akk = (x, akk) : hpos xs (akk + 1)
 
 buildEnvLet :: [LocDef] -> [(Expression, Int)]
-buildEnvLet xs = posL xs n
+buildEnvLet xs = hposL xs n
     where
         n = length xs
-        posL ((LocDef var _):xs) n = (var, n-1) : posL xs (n-1)
-        posL []                  n = []
+        hposL ((LocDef var _):xs) n = (var, n-1) : hposL xs (n-1)
+        hposL []                  n = []
 
 pos :: Expression -> [(Expression, Int)] -> Maybe Int
 pos _ []                      = Nothing
