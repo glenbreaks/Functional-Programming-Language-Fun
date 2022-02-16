@@ -109,7 +109,7 @@ tokenizer (x:xs) =
             _       | checkNumber x                   -> return (Number (read x) : rest)
                     | isAlpha (head x) && checkName x -> return (Name x          : rest)
                     | otherwise                       -> Left ("Invalid name: " ++ show x)
-tokenizer []             = return[]
+tokenizer []     = return []
 
 checkNumber :: String -> Bool
 checkNumber = foldr ((&&) . isDigit) True
