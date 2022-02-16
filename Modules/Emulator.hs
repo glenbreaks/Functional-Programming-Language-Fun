@@ -8,8 +8,8 @@ import Show
 
 showEmulate :: String -> IO()
 showEmulate xs = case compile xs of
-                    Left x -> putStr x
-                    Right x -> -- putStr $ show (EmulatorState (showRun x))
+                    Left x -> putStrLn x
+                    Right x ->
                         case showRun x of
                             Left x  -> putStrLn x
                             Right x -> putStr $ show (EmulatorState x)
@@ -25,10 +25,10 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                                 case runStack i pc stack heap global of
                                     Right xstack ->
                                         case runHeap i stack heap of
+                                            Left x -> [s]
                                             Right xheap -> s:hshowRun(s { pc    = xpc
                                                                         , stack = xstack
                                                                         , heap  = xheap })
-                                            Left x -> [s]
                                     Left x -> [s]
                             Left x -> [s]
                                 else [s]

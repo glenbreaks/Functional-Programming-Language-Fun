@@ -23,8 +23,11 @@ programInput = do
 
 input :: String -> IO ()
 input code = do
-  putStr "\nPlease select an option:\n"
-  putStr "[1] Tokenize  [2] Parse\n[3] Compile   [4] Emulate\n[5] Result    [6] New Program\n[7] Syntax    [0] Exit\n\n"
+  putStr ("\nPlease select an option:\n"
+       ++ "[1] Tokenize  [5] Result\n"
+       ++ "[2] Parse     [6] New Program\n"
+       ++ "[3] Compile   [7] Syntax\n"
+       ++ "[4] Emulate   [0] Exit\n\n")
   choice <- getLine
   case choice of
     "1" -> do
@@ -53,6 +56,7 @@ input code = do
       input code
     "0" -> goodbye
     _   -> do
+      putStr "\nSorry, that's not an option."
       input code
 
 goodbye :: IO ()

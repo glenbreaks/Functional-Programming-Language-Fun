@@ -145,30 +145,30 @@ parseCompareExpr xs1 = do
 
 parseAddExpr  :: Parser Expression
 parseAddExpr  xs1 = do
-    (e, xs2)  <- parseMultExpr  xs1
+    (e, xs2)  <- parseNegExpr  xs1
     (es, xs3) <- parseRestAddExpr xs2
     return (foldl Sum e es, xs3)
 
 parseRestAddExpr :: Parser [Expression]
 parseRestAddExpr (Plus : xs1)  = do
-    (e, xs2)  <- parsePositiveMultExpr xs1
+    (e, xs2)  <- parseMultExpr xs1
     (es, xs3) <- parseRestAddExpr xs2
     return (e:es, xs3)
 parseRestAddExpr (Minus : xs1) = do
-    (e, xs2)  <- parsePositiveMultExpr xs1
+    (e, xs2)  <- parseMultExpr xs1
     (es, xs3) <- parseRestAddExpr xs2
     return (Neg e:es, xs3)
 parseRestAddExpr xs            = return ([], xs)
 
+parseNegExpr :: Parser Expression
+parseNegExpr (Minus : xs1) = do
+    (e, xs2)  <- parseMultExpr  xs1
+    return (Neg e, xs2)
+parseNegExpr xs            = parseMultExpr  xs
+
 parseMultExpr  :: Parser Expression
 parseMultExpr  xs1 = do
-    (e, xs2)  <- parseNegExpr xs1
-    (es, xs3) <- parseRestMultExpr xs2
-    return (foldl Mult e es, xs3)
-
-parsePositiveMultExpr :: Parser Expression
-parsePositiveMultExpr xs1 = do
-    (e, xs2)  <- parseAtomicExpr  xs1
+    (e, xs2)  <- parseAtomicExpr xs1
     (es, xs3) <- parseRestMultExpr xs2
     return (foldl Mult e es, xs3)
 
@@ -182,12 +182,6 @@ parseRestMultExpr (DivBy : xs1) = do
     (es, xs3) <- parseRestMultExpr xs2
     return (NegExpo e:es, xs3)
 parseRestMultExpr xs            = return ([], xs)
-
-parseNegExpr :: Parser Expression
-parseNegExpr (Minus : xs1) = do
-    (e, xs2)  <- parseAtomicExpr  xs1
-    return (Neg e, xs2)
-parseNegExpr xs            = parseAtomicExpr  xs
 
 parseAtomicExpr  :: Parser Expression
 parseAtomicExpr  (Number i : xs1)  = return (Val i, xs1)
