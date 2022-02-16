@@ -14,7 +14,7 @@ letsGo = do
        ++ "    |__|      \\_____/  |__| \\__| |__|\n\n\n"
        ++ "This is our implementation of the functional programming language F.\n"
        ++ "We hope you have fun with Fun  : )     - Chrissi, Daniel, Jonny, Kathy and Lara\n\n"
-       ++ "\nPlease enter your Fun Program:\n")
+       ++ "\nPlease enter your Fun program:\n")
   programInput
 
 programInput = do
@@ -23,7 +23,8 @@ programInput = do
 
 input :: String -> IO ()
 input code = do
-  putStr ("\nPlease select an option:\n"
+  putStr ("\nYour program: " ++ code
+       ++ "\nPlease select an option:\n"
        ++ "[1] Tokenize  [5] Result\n"
        ++ "[2] Parse     [6] New Program\n"
        ++ "[3] Compile   [7] Syntax\n"
@@ -31,7 +32,7 @@ input code = do
   choice <- getLine
   case choice of
     "1" -> do
-      showTokens code
+      showTokenize code
       input code
     "2" -> do
       showParse code

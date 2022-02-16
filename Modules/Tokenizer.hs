@@ -1,4 +1,4 @@
-module Tokenizer (showTokens, tokenize) where
+module Tokenizer (showTokenize, tokenize) where
 import Datatypes (Token(..))
 import Show
 import Data.Char(isDigit, isAlpha, isAlphaNum)
@@ -9,12 +9,12 @@ import Control.Exception (Exception, throw)
 -- emulate bsp
 bsp = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
 
-showTokens :: String -> IO() -- just for output
-showTokens xs =
+showTokenize :: String -> IO() -- just for output
+showTokenize xs =
     case tokenize xs of
-        Right x -> putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokens x ++ "\n"
-                    where hshowTokens (x:xs) = show x ++ "\n" ++ hshowTokens xs
-                          hshowTokens []     = ""
+        Right x -> putStr $ showBoxed "Tokens" ++ "\n\n" ++ hshowTokenize x ++ "\n"
+                    where hshowTokenize (x:xs) = show x ++ "\n" ++ hshowTokenize xs
+                          hshowTokenize []     = ""
         Left x  -> putStrLn x
 
 tokenize :: String -> Either String [Token]
