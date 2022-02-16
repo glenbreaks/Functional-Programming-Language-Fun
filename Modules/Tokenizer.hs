@@ -63,10 +63,10 @@ tok (x:xs) = htok strings tokens (x:xs)
                   y : space zs
               else htok xs ys (z:zs)
           htok _ _ (z:zs) =
-              case tok zs of
+              case tok xs of
                   rest -> case z of
-                    _       | checkNumber z                   -> (Number (read z) : rest
-                            | isAlpha (head z) && checkName z -> Name z          : rest
+                    _       | checkNumber x                   -> Number (read x) : rest
+                            | isAlpha (head x) && checkName x -> Name x          : rest
                             | otherwise                       -> throw userError "InvalidName"
 tok [] = []
 
