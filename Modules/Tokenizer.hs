@@ -20,6 +20,7 @@ showTokenize xs =
 tokenize :: String -> Either String [Token]
 tokenize xs = tokenizer $ words $ spaceyfier xs
 
+
 spaceyfier :: String -> String
 spaceyfier x =
    case x of
@@ -38,6 +39,36 @@ spaceyfier x =
        ')' : xs       -> " ) "  ++ spaceyfier xs
        []             -> []
        _   : xs       -> head x : spaceyfier xs
+
+space :: String -> [Token]
+space = aspace chars tokens
+    where chars = ";,|&<+-*/()="
+          tokens = [Semicolon, Comma, Or, And, LessThan, Plus, Minus, Times, DivBy, OpenPar, ClosePar, Equals]
+          aspace (x:xs) (y:ys) (z:zs) =
+              if x == z then 
+                  if z == '=' && head zs == '=' then
+                          Is : space(tail zs)
+                  else y : space zs
+              else aspace xs ys (z:zs)
+--          aspace [] _ x = bspace x
+--                where bspace (x:xs) = 
+          aspace _ _ _ = []
+
+tok :: [String] -> [Token] 
+tok (x:xs) = htok strings tokens (x:xs)
+    where strings = ["|","&","not","<","==","-","+","/","*","(",")","let","in","if","then","else",";",",","=","true",",false"]
+          tokens = [Or,And,Not,LessThan,Is,Minus,Plus,DivBy,Times,OpenPar,ClosePar,Let,In,If,Then,Else,Semicolon,Comma,Equals,Boolean True, Boolean False]
+          htok (x:xs) (y:ys) (z:zs) =
+              if x == z then
+                  y : space zs
+              else htok xs ys (z:zs)
+          htok _ _ (z:zs) =
+              case tok zs of
+                  rest -> case z of
+                    _       | checkNumber z                   -> (Number (read z) : rest
+                            | isAlpha (head z) && checkName z -> Name z          : rest
+                            | otherwise                       -> throw userError "InvalidName"
+tok [] = []
 
 tokenizer :: [String] -> Either String [Token]
 tokenizer (x:xs) =
