@@ -168,20 +168,33 @@ parseNegExpr xs            = parseMultExpr  xs
 
 parseMultExpr  :: Parser Expression
 parseMultExpr  xs1 = do
-    (e, xs2)  <- parseAtomicExpr xs1
+    (e, xs2)  <- parseExpoExpr  xs1
     (es, xs3) <- parseRestMultExpr xs2
     return (foldl Mult e es, xs3)
 
 parseRestMultExpr :: Parser [Expression]
 parseRestMultExpr (Times : xs1) = do
-    (e, xs2)  <- parseAtomicExpr  xs1
+    (e, xs2)  <- parseExpoExpr  xs1
     (es, xs3) <- parseRestMultExpr xs2
     return (e:es, xs3)
 parseRestMultExpr (DivBy : xs1) = do
-    (e, xs2)  <- parseAtomicExpr  xs1
+    (e, xs2)  <- parseExpoExpr  xs1
     (es, xs3) <- parseRestMultExpr xs2
     return (NegExpo e:es, xs3)
 parseRestMultExpr xs            = return ([], xs)
+
+parseExpoExpr :: Parser Expression
+parseExpoExpr xs1 = do
+    (e, xs2)  <- parseAtomicExpr xs1
+    (es, xs3) <- parseRestExpoExpr xs2
+    return (foldl ExpoX e es, xs3)
+
+parseRestExpoExpr :: Parser [Expression]
+parseRestExpoExpr (Expo : xs1) = do
+    (e, xs2)  <- parseAtomicExpr xs1
+    (es, xs3) <- parseRestExpoExpr xs2
+    return (e:es, xs3)
+parseRestExpoExpr xs           = return ([], xs)
 
 parseAtomicExpr  :: Parser Expression
 parseAtomicExpr  (Number i : xs1)  = return (Val i, xs1)

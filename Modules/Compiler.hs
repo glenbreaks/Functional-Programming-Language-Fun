@@ -50,6 +50,7 @@ codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a [(v, pos
 codeExpr (IsX                a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Is, Makeapp, Makeapp]
 codeExpr (Sum                a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Plus, Makeapp, Makeapp]
 codeExpr (Mult               a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Times, Makeapp, Makeapp]
+codeExpr (ExpoX              a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre Expo, Makeapp, Makeapp]
 codeExpr (Function           a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Makeapp]
 codeExpr (Val                a)      env = [Pushval Float (int2Float a)]
 codeExpr (BoolVal            a)      env = [Pushval Bool x]
