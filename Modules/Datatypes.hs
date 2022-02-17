@@ -16,7 +16,7 @@ data Token
     | Plus
     | DivBy
     | Times
-    | Expo      -- !!!
+    | Expo
     | OpenPar
     | ClosePar
     | Let
@@ -48,7 +48,7 @@ data Expression
     | Sum       Expression Expression
     | NegExpo   Expression -- x hoch minus 1 = 1/x
     | Mult      Expression Expression
-    | ExpoX     Expression Expression   -- !!!
+    | ExpoX     Expression Expression
     | Neg       Expression
     | Function  Expression Expression
     | Val       Int
