@@ -13,22 +13,25 @@ showEmulate xs = case compile xs of
 
 showRun :: State -> Either String [State]
 showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
-    if not (mainInGlobal global) then Left "Missing main" else return (hshowRun s)
+    if not (mainInGlobal global) then Left "Missing main" else hshowRun s
         where hshowRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = global} =
                 let i = code!!pc in
                     if i /= Halt then
                         case runPC i pc stack heap of
-                            Left x -> [s]
+                            Left x -> Left x
                             Right xpc ->
                                 case runStack i pc stack heap global of
-                                    Left x -> [s]
+                                    Left x -> Left x
                                     Right xstack ->
                                         case runHeap i stack heap of
-                                            Left x -> [s]
-                                            Right xheap -> s:hshowRun(s { pc    = xpc
-                                                                        , stack = xstack
-                                                                        , heap  = xheap })
-                                else [s]
+                                            Left x -> Left x
+                                            Right xheap ->
+                                                case hshowRun (s { pc    = xpc
+                                                                 , stack = xstack
+                                                                 , heap  = xheap }) of
+                                                                    Left x  -> Left x
+                                                                    Right x -> return (s:x)
+                                else return [s]
 
 emulate :: String -> IO()
 emulate xs =
@@ -170,15 +173,13 @@ compute Is       (VAL Float x) (VAL Float y) | x == y    = return 1
                                              | otherwise = return 0
 compute Is       (VAL Bool x)  (VAL Bool y)  | x == y    = return 1
                                              | otherwise = return 0
+compute Is       _             _             = return 0
 compute Plus     (VAL Float x) (VAL Float y) = return (x + y)
 compute Times    (VAL Float x) (VAL Float y) = return (x * y)
 compute Expo     (VAL Float x) (VAL Float y) | floor y /= ceiling y = Left "Integer expected in exponent"
                                              | y > 0                = return (x ^ round y)
                                              | y < 0                = return (1 / x ^ round (-y))
                                              | otherwise            = return 1
-
-compute _ (VAL Bool x) (VAL Float y) = Left "Mismatched types"
-compute _ (VAL Float x) (VAL Bool y) = Left "Mismatched types"
 compute _ _             _            = Left "Mismatched types"
 
 

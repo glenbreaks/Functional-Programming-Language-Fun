@@ -92,7 +92,7 @@ instance Show Token
         show Plus            = "+"
         show DivBy           = "/"
         show Times           = "*"
-        show Expo            = "^"  -- !!!
+        show Expo            = "^"
         show OpenPar         = "("
         show ClosePar        = ")"
         show Let             = "let"
@@ -130,18 +130,7 @@ instance Show Instruction
           show Halt               = "Halt"
           show Unwind             = "Unwind"
           show Call               = "Call"
-        --   show (Pushpre If)       = "Pushpre if"
-        --   show (Pushpre Plus)     = "Pushpre +"
-        --   show (Pushpre Minus)    = "Pushpre -"
-        --   show (Pushpre Times)    = "Pushpre *"
           show (Pushpre DivBy)    = "Pushpre 1/"
-        --   show (Pushpre Or)       = "Pushpre |"
-        --   show (Pushpre And)      = "Pushpre &"
-        --   show (Pushpre Not)      = "Pushpre not"
-        --   show (Pushpre LessThan) = "Pushpre <"
-        --   show (Pushpre Is)       = "Pushpre =="
-        --   show (Pushpre OpenPar)  = "Pushpre ("
-        --   show (Pushpre ClosePar) = "Pushpre )"
           show (Pushpre x)        = "Pushpre " ++ show x
           show (Updatefun i)      = "Update " ++ show i
           show Updateop           = "Update op"
@@ -192,7 +181,7 @@ instance Show EmulatorState
     where show (EmulatorState (s1@State{pc=pc1, code=code}:s2@State{pc=pc2, stack=stack, heap=heap, global=global}:xs)) =
                 showBoxed (show (code!!pc1)) ++ "\n\n" ++ columns pc2 stack heap ++ show (EmulatorState (s2:xs))
           show (EmulatorState [s@State{pc=pc, code=code, stack=stack, heap=heap, global=global}]) =
-                showBoxed (show (code!!pc))  ++ "\n\n" ++ if pc == 3 then show (result s) else "Invalid input\n"
+                showBoxed (show (code!!pc))  ++ "\n\n" ++ if pc == 3 then show (result s) else "Runtime error\n"
           show (EmulatorState _) = ""
 
 instance Show Result
