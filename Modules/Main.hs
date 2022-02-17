@@ -3,6 +3,7 @@ import Tokenizer
 import Parser
 import Compiler
 import Emulator
+import Control.Exception (SomeException, try)
 
 letsGo :: IO ()
 letsGo = do
@@ -12,23 +13,36 @@ letsGo = do
        ++ "    |  |__   |  | |  | |   \\|  | |__|\n"
        ++ "    |   __|  |  |_|  | |  |\\   |  __\n"
        ++ "    |__|      \\_____/  |__| \\__| |__|\n\n\n"
-       ++ "This is our implementation of the functional programming language F.\n"
-       ++ "We hope you have fun with Fun  : )     - Chrissi, Daniel, Jonny, Kathy and Lara\n\n"
-       ++ "\nPlease enter your Fun program:\n")
-  programInput
-
-programInput = do
-  code <- getLine
-  input code
+       ++ "This is our implementation of the functional"
+       ++ "\nprogramming language F.\n\n"
+       ++ "We hope you have fun with Fun  : )"
+       ++ "\n    - Chrissi, Daniel, Jonny, Kathy and Lara\n\n\n"
+       ++ "Please enter your Fun program or press [l] to load a file:\n")
+  choice <- getLine 
+  case choice of
+    "l" -> do
+      putStr "\nPlease enter the name of your fun file:\n"
+      filename <- getLine
+      wrappedProgram <- try (readFile filename) :: IO (Either SomeException String)
+      case wrappedProgram of
+        Left  _       -> do 
+          putStrLn ("Couldn't find any file with the name " ++ filename)
+          input ""
+        Right program -> input program
+    x   -> input x 
 
 input :: String -> IO ()
 input code = do
-  putStr ("\nYour program: " ++ code
-       ++ "\nPlease select an option:\n"
-       ++ "[1] Tokenize  [5] Result\n"
-       ++ "[2] Parse     [6] New Program\n"
-       ++ "[3] Compile   [7] Syntax\n"
-       ++ "[4] Emulate   [0] Exit\n\n")
+  if code == "" then 
+    putStr "\n"
+  else
+    putStr ("\nYour program: \n" ++ code)
+  putStr ("\n\nPlease select an option:\n"
+       ++ "[1] Tokenize  [6] New Program\n"
+       ++ "[2] Parse     [7] Load File\n"
+       ++ "[3] Compile   [8] ReadMe\n"
+       ++ "[4] Emulate   [9] Syntax\n"
+       ++ "[5] Result    [0] Exit\n\n")
   choice <- getLine
   case choice of
     "1" -> do
@@ -48,8 +62,24 @@ input code = do
       input code
     "6" -> do
       putStr "\nPlease enter your Fun Program:\n"
-      programInput
+      code <- getLine
+      input code
     "7" -> do
+      putStr "\nPlease enter the name of your fun file:\n"
+      filename <- getLine
+      wrappedProgram <- try (readFile filename) :: IO (Either SomeException String)
+      case wrappedProgram of
+        Left  _       -> do 
+          putStrLn ("Couldn't find any file with the name " ++ filename)
+          input code
+        Right program -> input program
+    "8" -> do
+      readMe <- readFile "README.md"
+      putStr "\n\n"
+      putStr readMe
+      putStr "\n\nThis README is a markdown file. It looks better when opened in a markdown viewer.\n"
+      input code
+    "9" -> do
       syntax <- readFile "Syntax.txt"
       putStr "\n\n"
       putStr syntax
