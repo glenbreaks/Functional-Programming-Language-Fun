@@ -180,7 +180,7 @@ compute Expo     (VAL Float x) (VAL Float y) | floor y /= ceiling y = Left "Inte
                                              | y > 0                = return (x ^ round y)
                                              | y < 0                = return (1 / x ^ round (-y))
                                              | otherwise            = return 1
-compute _ _             _            = Left "Mismatched types"
+compute _        _             _             = Left "Mismatched types"
 
 
 --- support functions:
