@@ -1,14 +1,10 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-} -- Non-exhaustive pattern is not relevant in some cases
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Compiler (showCompile, compile) where
 import Datatypes
 import Parser
 import Show
 import GHC.Float (int2Float)
-
----------- Compiler:
-
--- bsp zeigen, showCompile bs
 
 showCompile :: String -> IO()
 showCompile xs =
@@ -43,7 +39,7 @@ codeExpr (LetX      (LocDefs a) b)   env = codeLocDefs a envLet ++ codeExpr b en
 codeExpr (IfX                a  b c) env = codeExpr c env ++ codeExpr b [(v, pos+1) | (v, pos) <- env] ++ codeExpr a [(v, pos+2) | (v, pos) <- env] ++ [Pushpre If, Makeapp, Makeapp, Makeapp]
 codeExpr (NotX               a)      env = codeExpr a env ++ [Pushpre Not, Makeapp]
 codeExpr (Neg                a)      env = codeExpr a env ++ [Pushpre Minus, Makeapp]
-codeExpr (NegExpo            a)      env = codeExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy hier 1/x da kein NegExpo Token existiert
+codeExpr (NegExpo            a)      env = codeExpr a env ++ [Pushpre DivBy, Makeapp] -- Token DivBy used here because there is no Token for NegExpo
 codeExpr (OrX                a  b)   env = codeExpr (IfX a   (BoolVal True) b)  env
 codeExpr (AndX               a  b)   env = codeExpr (IfX a b (BoolVal False))   env
 codeExpr (LessThanX          a  b)   env = codeExpr b env ++ codeExpr a [(v, pos+1) | (v, pos) <- env] ++ [Pushpre LessThan, Makeapp, Makeapp]
@@ -70,13 +66,13 @@ codeLocDefs x env = alloc n ++ cLocDefs x env n
         cLocDefs ((LocDef _ expr):xs) env n = codeExpr expr env ++ [Updatelet (n-1)] ++ cLocDefs xs env (n-1)
         cLocDefs []                   _   _ = []
 
---- Hilfsfunktionen Compiler:
+--- support functions:
 
 initCode :: [Instruction]
 initCode = [Reset, Pushfun "main", Call, Halt]
-    ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return] --BinärOp
-    ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return]                  --If
-    ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]                             --UnärOp
+    ++ [Pushparam 1, Unwind, Call, Pushparam 3, Unwind, Call, Operator BinaryOp, Updateop, Return]
+    ++ [Pushparam 1, Unwind, Call, Operator IfOp, Updateop, Unwind, Call, Return] 
+    ++ [Pushparam 1, Unwind, Call, Operator UnaryOp, Updateop, Return]
 
 buildEnv :: [Expression] -> [(Expression, Int)]
 buildEnv xs = hpos xs 1
@@ -95,6 +91,3 @@ pos :: Expression -> [(Expression, Int)] -> Maybe Int
 pos _ []                      = Nothing
 pos s ((x, i):xs) | s == x    = return i
                   | otherwise = pos s xs
-
--- instructions von / bzw - zeigen! (Makeapp)
--- Highlight: Token wiederverwendet bei Pushpre für Opeartionsdatentypen, wobei DivBy hier 1/x bedeutet (Unäres /)

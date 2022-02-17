@@ -14,7 +14,7 @@
    ghci Main.hs
    emulate "your Fun code"
    ```
-3. The hard way (*see below)
+3. The hard way (*see at the bottom of the ReadMe)
    
 <br/>
 
@@ -23,7 +23,10 @@ We made three adjustments to the F syntax:
 1. We decided to interchange the semicolons between multiple `Local Definitions` with commas because we wanted semicolons to be used only between multiple `Definitions` (for better readability).
 
 2. According to the script the precedence of the negation should be lower than the precedence of an addition. This would lead to `-5 + 2` being evaluated as `-7`. We wanted our syntax to be more intuitive so we changed the precedences to let `-5 + 2` be evaluated as `-3`.
-3. As opposed to the script we allow inputs of the form `A-B-C` and `A/B/C` by implementing a left associativity for `-` and `/`.   
+   
+3. As opposed to the script we allow inputs of the form `A-B-C` and `A/B/C` by implementing a left associativity for `-` and `/`.
+   
+4.  We also implemented exponential expressions. Only integers are allowed as exponents.
 <br/>
 
 ## Modules
@@ -42,10 +45,10 @@ Each module provides a `function` and a `showFunction`. When other modules want 
 
 ### Parser
 - ### `parse`
-    takes a `String` (your Fun program) as input, calls `tokenize` on it and converts the list of `Tokens` into an AST (abstract syntax tree) with `Expressions` as nodes and leafs.
+    takes a `String` (your Fun program) as input, calls `tokenize` on it and converts the list of `Tokens` into an AST (abstract syntax tree) with `Expressions` as nodes and leaves.
 
 - ### `showParse`
-    creates an output, that is easier to comprehend than the output of `parse`. It lists all `Definitions` with their arguments and represents the AST structure of the function body with parentheses.
+    creates an output that is easier to comprehend than the output of `parse`. It lists all `Definitions` with their arguments and represents the AST structure of the function body with parentheses.
     
     For example `showParse "main = cool 1; cool x = 10*x;"`
     creates the following output:

@@ -2,9 +2,6 @@ module Parser (showParse, parse) where
 import Datatypes
 import Tokenizer
 import Show
----------- Parser:
-
--- bsp zeigen, showParse bsp
 
 showParse :: String -> IO()
 showParse xs =
@@ -29,10 +26,8 @@ parseProgram xs1 = do
             (es, xs4) <- parseRestProgram xs3
             case xs4 of
                 []    -> return (Program (e:es), xs4)
-                (x:_) -> Left ("Parse error on input '" ++ show x ++ "'")   -- immer wenn die Restliste nicht leer ist (wenn Code nicht vollständig geparst werden konnte) -> Fehler  
-        _               -> Left ("Semicolon expected after definition '" ++ showDef e ++ "'") -- showDef zieht Funktionsnamen aus Datentyp Definition
-
--- showParse "main = 1;, false," (allg Fehlerbehandlung) 396
+                (x:_) -> Left ("Parse error on input '" ++ show x ++ "'")
+        _               -> Left ("Semicolon expected after definition '" ++ showDef e ++ "'")
 
 parseRestProgram :: Parser [Definition]
 parseRestProgram xs1 = do
@@ -102,10 +97,6 @@ parseExpr (If : xs1)  = do
                 _          -> Left "Expected 'else' after 'then' block"
         _          -> Left "Expected 'then' after 'if' block"
 parseExpr xs          = parseOrExpr xs
-
--- Beispiele: Semicolon weg, Equals weg
-
-----------------------------------------------------------
 
 parseOrExpr :: Parser Expression
 parseOrExpr xs1 = do
@@ -231,5 +222,3 @@ parseRestAtomicExpr xs                = return ([], xs)
 parseVariable :: Parser Expression
 parseVariable (Name i : xs) = return (Variable i, xs)
 parseVariable _             = Left "Variable expected"
-
--- Beispiele: ParsePositiveMult, AtomicExpr: restAtomic nur noch in Name, Unäres - und /, Assoziativität von Minus und /!

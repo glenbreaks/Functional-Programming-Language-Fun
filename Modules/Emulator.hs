@@ -3,9 +3,6 @@ import Datatypes
 import Compiler
 import Show
 
------------------ functions for nice outputs of emulator:
-
-
 showEmulate :: String -> IO()
 showEmulate xs = case compile xs of
                     Left x -> putStrLn ("*** " ++ x)
@@ -32,10 +29,6 @@ showRun s@State{pc = pc, code = code, stack = stack, heap = heap, global = globa
                                                                         , stack = xstack
                                                                         , heap  = xheap })
                                 else [s]
-
------------------ Emulator:
-
--- bsp zeigen, emulate bsp, showEmulate bsp
 
 emulate :: String -> IO()
 emulate xs =
@@ -92,7 +85,7 @@ runStack (Pushfun arg)   _ s _ g =
     case address arg g of
         Left x  -> Left x
         Right x -> return (s ++ ["h" ++ show x])
-runStack (Pushval t v)   _ s h _ = return (s ++ ["h" ++ show (length h)]) -- new
+runStack (Pushval t v)   _ s h _ = return (s ++ ["h" ++ show (length h)])
 runStack (Pushparam arg) _ s h _ =
     case add2arg (s!!(length s-arg-2)) h of
         Left x  -> Left x
@@ -135,8 +128,8 @@ runHeap :: Instruction -> [String] -> [HeapCell] -> Either String [HeapCell]
 runHeap (Pushval t v) _ h = return (h ++ [VAL t v])
 runHeap Makeapp       s h = return (h ++ [APP (getAddress (last s))  (getAddress (s!!(length s-2)))])
 runHeap (Pushpre op)  _ h = return (h ++ [PRE op (arity op)])
-runHeap Updateop      s h = return (insert1 (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insert2 (getAddress (s!!(length s-3))) h)
-runHeap (Updatefun f) s h = return (insert1 (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insert2 (getAddress (s!!(length s-f-3))) h)
+runHeap Updateop      s h = return (insertPre (getAddress (s!!(length s-3))) 0 h ++ [h!!getAddress (last s)] ++ insertPost (getAddress (s!!(length s-3))) h)
+runHeap (Updatefun f) s h = return (insertPre (getAddress (s!!(length s-f-3))) 0 h ++ [IND (getAddress (last s))] ++ insertPost (getAddress (s!!(length s-f-3))) h)
 runHeap (Operator op) s h =
     case op of
         UnaryOp  -> let a = val (h!!getAddress (s!!(length s-3))) h
@@ -146,7 +139,7 @@ runHeap (Operator op) s h =
                             PRE op _ ->
                                 case compute op b UNINITIALIZED of
                                     Left x  -> Left x
-                                    Right x -> return (h ++ [VAL (findType op) x]) -- zum Aufruf compute
+                                    Right x -> return (h ++ [VAL (findType op) x])
                             _        -> Left "Runtime error"
         BinaryOp -> let a = val (h!!getAddress (s!!(length s-4))) h
                         b = val (h!!getAddress (s!!(length s-2))) h
@@ -163,7 +156,7 @@ runHeap Alloc         _ h = return (h ++ [UNINITIALIZED])
 runHeap (Updatelet n) s h =
     case add2arg (s!!(length s-n-2)) h of
         Left x  -> Left x
-        Right x -> return (insert1 x 0 h ++ [IND (getAddress (last s))] ++ insert2 x h)
+        Right x -> return (insertPre x 0 h ++ [IND (getAddress (last s))] ++ insertPost x h)
 runHeap _             _ h = return h
 
 compute :: Token -> HeapCell -> HeapCell -> Either String Value
@@ -189,30 +182,30 @@ compute _ (VAL Float x) (VAL Bool y) = Left "Mismatched types"
 compute _ _             _            = Left "Mismatched types"
 
 
---- Hilfsfunktionen Emulator:
+--- support functions:
 
--- sucht in der globalen Umgebung nach einem Funktionsnamen und liefert die HeapAdresse dieser Definition
+-- searches for a function name in the gloabl environment and returns the heapaddress of the associated definition
 address :: String -> [(String, Int)] -> Either String Int
 address arg ((x, y):xs)
     | x == arg  = return y
     | otherwise = address arg xs
-address arg []    = Left ("Variable '" ++ arg ++ "' not in scope")     -- Fehler wird z.B. bei f a b = x; geworfen 
+address arg []    = Left ("Variable '" ++ arg ++ "' not in scope")
 
--- liefert das 2. Argument einer APP-Zelle an einer bestimmten Heap-Adresse
+-- returns the second argument of APP cell at a specific heap address
 add2arg :: String -> [HeapCell] -> Either String Int
 add2arg adr h =
     case val (h!!getAddress adr) h of
         APP _ x -> return x
         _       -> Left "Runtime error"
 
--- liefert den Typ einer VAL-Zelle an einer bestimmten Heap-Adresse
+-- returns the value of VAL cell at a specific heap address
 typ :: Int -> [HeapCell] -> Type
 typ adr h =
     case val (h!!adr) h of
         VAL Float _ -> Float
         _           -> Bool
 
--- liefert den Wert einer IND-Zelle an einer bestimmten Heap-Adresse
+-- returns the value of an IND cell at a spacific heap address
 val :: HeapCell -> [HeapCell] -> HeapCell
 val x h =
     case x of
@@ -231,18 +224,17 @@ findType DivBy = Float
 findType Expo  = Float
 findType _     = Bool
 
--- prüft, ob in Global eine main Funktion vorhanden ist                     
 mainInGlobal :: [([Char], b)] -> Bool
 mainInGlobal (("main",_):xs) = True
 mainInGlobal (x:xs)          = mainInGlobal xs
 mainInGlobal []              = False
 
-insert1 :: Int -> Int -> [HeapCell] -> [HeapCell]
-insert1 adr akk h | adr > 0          = h!!akk : insert1 (adr-1) (akk+1) h
+insertPre :: Int -> Int -> [HeapCell] -> [HeapCell]
+insertPre adr akk h | adr > 0          = h!!akk : insertPre (adr-1) (akk+1) h
                   | otherwise        = []
 
-insert2 :: Int -> [HeapCell]-> [HeapCell]
-insert2 adr h   | adr < length h-1  = h!!(adr+1)  : insert2 (adr+1) h
+insertPost :: Int -> [HeapCell]-> [HeapCell]
+insertPost adr h   | adr < length h-1  = h!!(adr+1)  : insertPost (adr+1) h
                 | otherwise         = []
 
 arity :: Token -> Op
@@ -255,4 +247,3 @@ arity _     = BinaryOp
 getAddress :: String -> Int
 getAddress xs = read (tail xs) :: Int
 
--- Beispiele: showRun mit allen States, showEmulate, Fehler erzeugen, Stack aus Strings!!!
