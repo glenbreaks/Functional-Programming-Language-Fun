@@ -94,4 +94,7 @@ goodbye :: IO ()
 goodbye = do
   putStr "\nGoodbye!\n\n"
 
-ex = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
+ex1 = "main = quadratwurzel 25; quadratwurzel x = 1 + qw x 20; qw a b = if b == 0 then a else (a-1)/(2+qw a (b-1));"
+ex2 = "main = 5-2-1 + 8/2/3;" -- left associativities of - and /
+ex3 = "main = let x = 3, y = 2 in x*y;" -- commas instead of semicolons in loacl definitions
+ex4 = "main = (2^3 + 2^(-3) / 2^0 + 2^2^2)^2;" -- exponential functions allowed

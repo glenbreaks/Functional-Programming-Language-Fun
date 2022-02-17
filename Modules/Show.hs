@@ -36,13 +36,13 @@ columns :: Int -> [String] -> [HeapCell] -> String
 columns pc stack (h:heap) =
     case stack of
         (s:stack)  -> "T:  " ++ show (length stack) ++ indent (15-length (show (length stack)))
-                                   ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
-                                   ++ "h0: "++ indent 2 ++ show h
+                             ++ "s0: " ++ indent 2 ++ s ++ indent (15-length s)
+                             ++ "h0: "++ indent 2 ++ show h
                              ++ "\n" ++ hcolumns 1 [pc] stack heap
-        _          -> "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))          -- stack-1?
-                            ++ indent 21 --    ++ "s0: " ++ indent 2 ++ s ++ indent (15-length stack)
-                            ++ "h0: "++ indent 2 ++ show h
-                ++ "\n" ++ hcolumns 1 [pc] stack heap
+        _          -> "T:  " ++ show (length stack-1) ++ indent (15-length (show (length stack-1)))
+                             ++ indent 21
+                             ++ "h0: "++ indent 2 ++ show h
+                             ++ "\n" ++ hcolumns 1 [pc] stack heap
     where hcolumns akk [x] (y:ys) (z:zs) = "PC: " ++ show x ++ indent (15-length (show x))
                                            ++ "s" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ y ++ indent (15-length y)
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
@@ -66,7 +66,7 @@ columns pc stack (h:heap) =
                                            ++ "h" ++ show akk ++ ":" ++ indent (4-length (show akk)) ++ show z
                                            ++ "\n" ++ hcolumns (akk+1) [] [] zs
           hcolumns _   _   _      _      = ""
-columns _ _ _ = ""
+columns _  _     _        = ""
 
 
 result :: State -> Result
