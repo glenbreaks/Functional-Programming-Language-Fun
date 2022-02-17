@@ -15,8 +15,10 @@ CompareExpr      ::= AddExpr [("<" | "==") AddExpr]
 AddExpr          ::= NegExpr RestAddExpr
 RestAddExpr      ::= e | ["+" | "-"] MultExpr RestAddExpr
 NegExpr          ::= ["-"] MultExpr
-MultExpr         ::= NegExpr RestMultExpr
-RestMultExpr     ::= e | ["*" | "/"] AtomicExpr RestMultExpr
+MultExpr         ::= ExpoExpr RestMultExpr
+RestMultExpr     ::= e | ["*" | "/"] ExpoExpr RestMultExpr
+ExpoExpr         ::= AtomicExpr RestExpoExpr
+RestExpoExpr     ::= e | "^" AtomicExpr RestExpoExpr
 AtomicExpr       ::= (Number | Boolean | "(" Expr ")" | Variable) RestAtomicExpr
 RestAtomicExpr   ::= e | (Number | Boolean | "(" Expr ")" | Variable) RestAtomicExpr
 Variable         ::= Name
