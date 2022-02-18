@@ -3,6 +3,7 @@ import Tokenizer
 import Parser
 import Compiler
 import Emulator
+import Control.Exception (SomeException, try)
 
 letsGo :: IO ()
 letsGo = do
@@ -22,8 +23,8 @@ letsGo = do
     "l" -> do
       putStr "\nPlease enter the name of your fun file:\n"
       filename <- getLine
-      wrappedProgram <- try (readFile filename) :: IO (Either SomeException String)
-      case wrappedProgram of
+      eitherProgram <- try (readFile filename) :: IO (Either SomeException String)
+      case eitherProgram of
         Left  _       -> do 
           putStrLn ("Couldn't find any file with the name " ++ filename)
           input ""
@@ -66,8 +67,8 @@ input code = do
     "7" -> do
       putStr "\nPlease enter the name of your fun file:\n"
       filename <- getLine
-      wrappedProgram <- try (readFile filename) :: IO (Either SomeException String)
-      case wrappedProgram of
+      eitherProgram <- try (readFile filename) :: IO (Either SomeException String)
+      case eitherProgram of
         Left  _       -> do 
           putStrLn ("Couldn't find any file with the name " ++ filename)
           input code
