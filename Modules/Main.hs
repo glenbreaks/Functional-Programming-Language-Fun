@@ -74,13 +74,13 @@ input code = do
           input code
         Right program -> input program
     "8" -> do
-      readMe <- readFile "README.md"
+      readMe <- readFile "../README.md"
       putStr "\n\n"
       putStr readMe
       putStr "\n\nThis README is a markdown file. It looks better when opened in a markdown viewer.\n"
       input code
     "9" -> do
-      syntax <- readFile "Syntax.txt"
+      syntax <- readFile "../Syntax.txt"
       putStr "\n\n"
       putStr syntax
       putStr "\n\n"
