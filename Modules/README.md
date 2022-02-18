@@ -81,14 +81,16 @@ Each module provides a `function` and a `showFunction`. When other modules want 
     takes a `String` (your Fun program) as input, calls `compile` on it and uses the `State` as input for `run` which emulates the `Instructions` step by step and changes `PC`, `Stack` and `Heap` accordingly. It is a recursive function which overwrites the old `State` after each `Instruction` is processed. The final `State` contains the result of the emulation and is returned to `emulate` which unpacks the result and returns it.
 
 - ### `showEmulate`
-    visualizes `emulate` by showing each state of the emulation process. In order to do that, it needs to know how the `State` looked after each `Instruction`, but run doesn't provide this information. So it calls `showRun` which doesn't overwrite the old `State`, but rather appends each new `State` to a list in a recursive manner.
+    visualizes `emulate` by showing each state of the emulation process. In order to do that, it needs to know how the `State` looked after each `Instruction` but run doesn't provide this information. So it calls `showRun` which doesn't overwrite the old `State`, but rather appends each new `State` to a list in a recursive manner.
    
 <br/>
 
 ## Highlights
 - letsGo function
 - monadic error handling
-- syntax changes
+- console output of `showFunctions`
+- associativity of `-` and `/`
+- exponential functions
 - it works
 - it's Fun!
   
@@ -104,7 +106,6 @@ Each module provides a `function` and a `showFunction`. When other modules want 
    import Compiler
    import Emulator
    import Datatypes
-   import Show
    example = showTokenize "your Fun code"
    ```
    ```Shell
