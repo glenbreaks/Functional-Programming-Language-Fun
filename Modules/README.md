@@ -19,7 +19,7 @@
 <br/>
 
 ## Syntax changes
-We made three adjustments to the F syntax:
+We made four adjustments to the F syntax:
 1. We decided to interchange the semicolons between multiple `Local Definitions` with commas because we wanted semicolons to be used only between multiple `Definitions` (for better readability).
 
 2. According to the script the precedence of the negation should be lower than the precedence of an addition. This would lead to `-5 + 2` being evaluated as `-7`. We wanted our syntax to be more intuitive so we changed the precedences to let `-5 + 2` be evaluated as `-3`.
