@@ -1,5 +1,5 @@
 
-# FUN! 
+# FUN - a functional programming language in Haskell 
 ### An implementation of the functional programming language F in Haskell
 <br/>
 
